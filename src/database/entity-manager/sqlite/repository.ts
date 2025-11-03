@@ -66,6 +66,12 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
         const placeholders = queryFilter.value.map(() => '?').join(',');
         where.push(`"${queryFilter.field}" IN (${placeholders})`);
         values.push(...queryFilter.value);
+      } else if (
+        queryFilter.operator === QueryOperatorEnum.EQUALS &&
+        (queryFilter.value === null || queryFilter.value === undefined)
+      ) {
+        // Handle null comparison - use IS NULL instead of = NULL
+        where.push(`"${queryFilter.field}" IS NULL`);
       } else {
         where.push(`"${queryFilter.field}" ${queryFilter.operator} ?`);
         if (

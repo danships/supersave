@@ -40,9 +40,9 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
       whereValues.push(value);
     });
 
-    const query = `SELECT id,contents FROM ${this.pool.escapeId(this.tableName)} WHERE id IN(${wherePlaceholders.join(
-      ','
-    )})`;
+    const query = `SELECT id,contents FROM ${this.pool.escapeId(
+      this.tableName
+    )} WHERE id IN(${wherePlaceholders.join(',')})`;
     const result = await getQuery<EntityRow>(this.pool, query, whereValues);
     const transformResult: T[] = [];
     if (result) {
@@ -59,7 +59,9 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
   }
 
   public async getAll(): Promise<T[]> {
-    const query = `SELECT id,contents FROM ${this.pool.escapeId(this.tableName)}`;
+    const query = `SELECT id,contents FROM ${this.pool.escapeId(
+      this.tableName
+    )}`;
     const result = await getQuery<EntityRow>(this.pool, query);
 
     if (result) {
@@ -83,8 +85,16 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
         });
 
         where.push(
-          `${this.pool.escapeId(queryFilter.field)} IN(${placeholders.join(',')})`
+          `${this.pool.escapeId(queryFilter.field)} IN(${placeholders.join(
+            ','
+          )})`
         );
+      } else if (
+        queryFilter.operator === QueryOperatorEnum.EQUALS &&
+        (queryFilter.value === null || queryFilter.value === undefined)
+      ) {
+        // Handle null comparison - use IS NULL instead of = NULL
+        where.push(`${this.pool.escapeId(queryFilter.field)} IS NULL`);
       } else {
         where.push(
           `${this.pool.escapeId(queryFilter.field)} ${queryFilter.operator} ?`
@@ -104,7 +114,9 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
       }
     });
 
-    let sqlQuery = `SELECT id,contents FROM ${this.pool.escapeId(this.tableName)}
+    let sqlQuery = `SELECT id,contents FROM ${this.pool.escapeId(
+      this.tableName
+    )}
       ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
     `;
     if (query.getSort().length > 0) {
@@ -134,7 +146,9 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
   }
 
   public async deleteUsingId(id: string): Promise<void> {
-    const query = `DELETE FROM ${this.pool.escapeId(this.tableName)} WHERE id = ?`;
+    const query = `DELETE FROM ${this.pool.escapeId(
+      this.tableName
+    )} WHERE id = ?`;
     await executeQuery(this.pool, query, [id]);
   }
 
@@ -265,7 +279,9 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
   }
 
   protected async queryById(id: string): Promise<T | null> {
-    const query = `SELECT id,contents FROM ${this.pool.escapeId(this.tableName)} WHERE id = ? LIMIT 1`;
+    const query = `SELECT id,contents FROM ${this.pool.escapeId(
+      this.tableName
+    )} WHERE id = ? LIMIT 1`;
     debug('Query for getById', query, id);
     const result = await getQuery<EntityRow>(this.pool, query, [id]);
     if (result.length > 0) {
