@@ -338,4 +338,52 @@ describe('there can be filtered on relation fields', () => {
 
     await superSave.close();
   });
+
+  test('can filter by null values using eq', async () => {
+    interface PlanetWithOptionalField extends Planet {
+      description?: string | null;
+    }
+
+    const filteredPlanetEntity: EntityDefinition = {
+      ...planetEntity,
+      filterSortFields: {
+        ...(planetEntity.filterSortFields || {}),
+        name: 'string',
+        description: 'string',
+      },
+    };
+
+    const superSave: SuperSave = await SuperSave.create(getConnection());
+    const planetRepository =
+      await superSave.addEntity<PlanetWithOptionalField>(filteredPlanetEntity);
+
+    // Create planets with null and non-null description values
+    await planetRepository.create({
+      name: 'Earth',
+      description: 'Blue planet',
+    });
+    await planetRepository.create({ name: 'Mars', description: null });
+    await planetRepository.create({ name: 'Jupiter', description: null });
+    await planetRepository.create({ name: 'Venus', description: 'Hot planet' });
+
+    // Query for planets with null description
+    const nullQuery: Query = planetRepository.createQuery();
+    nullQuery.eq('description', null);
+
+    const nullResults = await planetRepository.getByQuery(nullQuery);
+    expect(nullResults).toHaveLength(2);
+    expect(
+      nullResults.map((p) => (p as PlanetWithOptionalField).name).sort()
+    ).toEqual(['Jupiter', 'Mars']);
+
+    // Query for planets with non-null description to ensure normal queries still work
+    const nonNullQuery: Query = planetRepository.createQuery();
+    nonNullQuery.eq('description', 'Blue planet');
+
+    const nonNullResults = await planetRepository.getByQuery(nonNullQuery);
+    expect(nonNullResults).toHaveLength(1);
+    expect((nonNullResults[0] as PlanetWithOptionalField).name).toBe('Earth');
+
+    await superSave.close();
+  });
 });
