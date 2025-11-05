@@ -31,7 +31,7 @@ services:
   #     #DEBUG: supersave:*
 
   mysql:
-    image: mysql:5.7    
+    image: mysql:8.4
     ports:
       - 3306:3306
     environment:
@@ -39,3 +39,13 @@ services:
       - MYSQL_USER=supersave
       - MYSQL_PASSWORD=savesuper
       - MYSQL_RANDOM_ROOT_PASSWORD=1
+
+  mariadb:
+    image: mariadb:11.8
+    ports:
+        - 3307:3306
+    environment:
+      - MARIADB_DATABASE=supersave
+      - MARIADB_USER=supersave
+      - MARIADB_PASSWORD=savesuper
+      - MARIADB_RANDOM_ROOT_PASSWORD=1

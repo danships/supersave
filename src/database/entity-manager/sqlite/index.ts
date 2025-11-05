@@ -54,7 +54,7 @@ class SqliteEntityManager extends EntityManager {
   protected createTable(tableName: string): Promise<void> {
     debug(`Creating table ${tableName}.`);
     this.connection.exec(
-      `CREATE TABLE IF NOT EXISTS ${tableName} (id TEXT PRIMARY KEY , contents TEXT NOT NULL)`
+      `CREATE TABLE IF NOT EXISTS ${tableName} (id TEXT PRIMARY KEY , contents JSON NOT NULL)`
     );
     return Promise.resolve();
   }

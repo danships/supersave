@@ -63,7 +63,7 @@ class MysqlEntityManager extends EntityManager {
 
     return executeQuery(
       this.pool,
-      `CREATE TABLE IF NOT EXISTS ${tableName} (id VARCHAR(32) PRIMARY KEY, contents LONGTEXT NOT NULL)`
+      `CREATE TABLE IF NOT EXISTS ${tableName} (id VARCHAR(32) PRIMARY KEY, contents JSON NOT NULL)`
     );
   }
 
