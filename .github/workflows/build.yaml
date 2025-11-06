@@ -89,7 +89,7 @@ jobs:
             mysql:8.4
 
           # Wait for MySQL to be ready
-          docker exec mysql-test mysqladmin ping -h localhost -u root -ptestpassword --wait=30
+          docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --wait=30
 
           pnpm test:mysql
 
