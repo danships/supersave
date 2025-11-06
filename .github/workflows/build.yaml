@@ -71,7 +71,7 @@ jobs:
           # Wait for Mariadb to be ready
           docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --wait=30
 
-          pnpm test:mysql
+          pnpm test:mariadb
 
       - name: Stop Mariadb container
         if: always()
@@ -89,7 +89,7 @@ jobs:
             mysql:8.4
 
           # Wait for MySQL to be ready
-          docker exec mysql-test mysql-admin ping -h localhost -u root -ptestpassword --wait=30
+          docker exec mysql-test mysqladmin ping -h localhost -u root -ptestpassword --wait=30
 
           pnpm test:mysql
 
