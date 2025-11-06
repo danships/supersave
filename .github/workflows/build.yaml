@@ -57,6 +57,26 @@ jobs:
       - name: Run sqlite tests
         run: pnpm test
 
+      - name: Run mariadb tests
+        run: |
+          docker run -d --rm \
+            --name mariadb-test \
+            -e MYSQL_ROOT_PASSWORD=testpassword \
+            -e MYSQL_DATABASE=supersave \
+            -e MYSQL_USER=supersave \
+            -e MYSQL_PASSWORD=savesuper \
+            -p 3307:3306 \
+            mariadb:11.7.2
+
+          # Wait for Mariadb to be ready
+          docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --wait=30
+
+          pnpm test:mariadb
+
+      - name: Stop Mariadb container
+        if: always()
+        run: docker stop mariadb-test
+
       - name: Run mysql tests
         run: |
           docker run -d --rm \
@@ -66,10 +86,10 @@ jobs:
             -e MYSQL_USER=supersave \
             -e MYSQL_PASSWORD=savesuper \
             -p 3306:3306 \
-            mariadb:11.7.2
+            mysql:8.4
 
           # Wait for MySQL to be ready
-          docker exec mysql-test mariadb-admin ping -h localhost -u root -ptestpassword --wait=30
+          docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --wait=30
 
           pnpm test:mysql
 

@@ -43,16 +43,14 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     const query = `SELECT id,contents FROM ${this.pool.escapeId(
       this.tableName
     )} WHERE id IN(${wherePlaceholders.join(',')})`;
-    const result = await getQuery<EntityRow>(this.pool, query, whereValues);
-    const transformResult: T[] = [];
+    const result = await getQuery<
+      EntityRow | { id: string; contents: string | object }
+    >(this.pool, query, whereValues);
+
     if (result) {
-      const promises = [];
-      for (const [iter, element] of result.entries()) {
-        const promise = this.transformQueryResultRow(element);
-        promises.push(promise);
-        transformResult[iter] = await promise;
-      }
-      await Promise.all(promises);
+      const transformResult: T[] = await Promise.all(
+        result.map((element) => this.transformQueryResultRow(element))
+      );
       return transformResult;
     }
     return [];
@@ -62,10 +60,15 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     const query = `SELECT id,contents FROM ${this.pool.escapeId(
       this.tableName
     )}`;
-    const result = await getQuery<EntityRow>(this.pool, query);
+    const result = await getQuery<
+      EntityRow | { id: string; contents: string | object }
+    >(this.pool, query);
 
     if (result) {
-      const newResults = await this.transformQueryResultRows(result);
+      const newResults: T[] = [];
+      for (const row of result) {
+        newResults.push(await this.transformQueryResultRow(row));
+      }
       return newResults;
     }
     return [];
@@ -137,10 +140,15 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     }
 
     debug('Querying data using query.', sqlQuery);
-    const result = await getQuery<EntityRow>(this.pool, sqlQuery, values);
+    const result = await getQuery<
+      EntityRow | { id: string; contents: string | object }
+    >(this.pool, sqlQuery, values);
     debug('Found result count', result.length);
     if (result) {
-      return this.transformQueryResultRows(result);
+      const newResults: T[] = await Promise.all(
+        result.map((row) => this.transformQueryResultRow(row))
+      );
+      return newResults;
     }
     return [];
   }
@@ -278,12 +286,29 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     return this.queryById(object.id as string) as unknown as Promise<T>;
   }
 
+  protected async transformQueryResultRow(
+    row: EntityRow | { id: string; contents: string | object }
+  ): Promise<T> {
+    // MySQL JSON columns return objects, not strings - handle both cases
+    const parsedContents =
+      typeof row.contents === 'string'
+        ? JSON.parse(row.contents)
+        : row.contents;
+    return {
+      ...this.definition.template,
+      ...(await this.fillInRelations(parsedContents)),
+      id: row.id, // always make the row the leading ID field
+    } as unknown as T;
+  }
+
   protected async queryById(id: string): Promise<T | null> {
     const query = `SELECT id,contents FROM ${this.pool.escapeId(
       this.tableName
     )} WHERE id = ? LIMIT 1`;
     debug('Query for getById', query, id);
-    const result = await getQuery<EntityRow>(this.pool, query, [id]);
+    const result = await getQuery<
+      EntityRow | { id: string; contents: string | object }
+    >(this.pool, query, [id]);
     if (result.length > 0) {
       return this.transformQueryResultRow(result[0]);
     }
