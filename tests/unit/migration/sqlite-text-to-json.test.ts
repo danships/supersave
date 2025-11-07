@@ -156,12 +156,79 @@ describe('SQLite migration tests', () => {
       );
       expect(migratedContentsColumn?.type.toUpperCase()).toBe('JSON');
 
+      // Verify name column is a generated column
+      const tableSql = migratedDb
+        .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+        .get('planet') as { sql: string } | undefined;
+      expect(tableSql?.sql).toBeTruthy();
+      expect(tableSql?.sql).toContain('GENERATED ALWAYS AS');
+      expect(tableSql?.sql).toContain('json_extract');
+
       // Verify data is still accessible
       const planets = await planetRepository.getAll();
       expect(planets).toHaveLength(1);
       expect(planets[0].name).toBe('Earth');
 
       migratedDb.close();
+      await superSave.close();
+    } finally {
+      try {
+        fs.unlinkSync(dbPath);
+        fs.rmdirSync(tmpDir);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  });
+
+  test('SQLite: new tables with filterSortFields use generated columns', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'supersave-test-'));
+    const dbPath = path.join(tmpDir, 'test.db');
+
+    try {
+      const connectionString = `sqlite://${dbPath}`;
+      const superSave = await SuperSave.create(connectionString);
+
+      const entityWithFilter: EntityDefinition = {
+        ...planetEntity,
+        filterSortFields: {
+          name: 'string',
+          distance: 'number',
+          inhabitable: 'boolean',
+        },
+      };
+
+      const planetRepository: Repository<Planet> =
+        await superSave.addEntity<Planet>(entityWithFilter);
+
+      // Create a planet to ensure table is created
+      await planetRepository.create({
+        name: 'Earth',
+        distance: 100,
+        inhabitable: true,
+      });
+
+      // Verify columns are generated columns
+      const verifyDb = new Database(dbPath);
+      const tableSql = verifyDb
+        .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+        .get('planet') as { sql: string } | undefined;
+
+      expect(tableSql?.sql).toBeTruthy();
+      expect(tableSql?.sql).toContain('GENERATED ALWAYS AS');
+      expect(tableSql?.sql).toContain('json_extract');
+      expect(tableSql?.sql).toContain('name');
+      expect(tableSql?.sql).toContain('distance');
+      expect(tableSql?.sql).toContain('inhabitable');
+
+      // Verify filtering still works
+      const query = planetRepository.createQuery();
+      query.eq('name', 'Earth');
+      const results = await planetRepository.getByQuery(query);
+      expect(results).toHaveLength(1);
+      expect(results[0].name).toBe('Earth');
+
+      verifyDb.close();
       await superSave.close();
     } finally {
       try {

@@ -316,17 +316,22 @@ describe('MySQL/MariaDB migration tests', () => {
     const planetRepository: Repository<Planet> =
       await superSave.addEntity<Planet>(entityWithFilter);
 
-    // Verify migration occurred - contents should be JSON, name should be VARCHAR(255)
+    // Verify migration occurred - contents should be JSON, name should be a generated column
     const verifyConnection: Connection =
       await mysql.createConnection(connectionString);
     const [columns] = (await verifyConnection.query(
-      `SELECT COLUMN_NAME, COLUMN_TYPE, DATA_TYPE
+      `SELECT COLUMN_NAME, COLUMN_TYPE, DATA_TYPE, GENERATION_EXPRESSION
        FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE()
          AND TABLE_NAME = ?`,
       [tableName]
     )) as [
-      Array<{ COLUMN_NAME: string; COLUMN_TYPE: string; DATA_TYPE: string }>,
+      Array<{
+        COLUMN_NAME: string;
+        COLUMN_TYPE: string;
+        DATA_TYPE: string;
+        GENERATION_EXPRESSION: string | null;
+      }>,
       unknown,
     ];
 
@@ -339,6 +344,11 @@ describe('MySQL/MariaDB migration tests', () => {
       'contents'
     );
     expect(contentsType).toBe('json');
+    // Verify name column is a generated column
+    expect(nameColumn?.GENERATION_EXPRESSION).toBeTruthy();
+    expect(nameColumn?.GENERATION_EXPRESSION?.toLowerCase()).toContain(
+      'json_extract'
+    );
     expect(nameColumn?.COLUMN_TYPE.toLowerCase()).toMatch(/^varchar\(255\)$/);
 
     await verifyConnection.end();
@@ -449,5 +459,74 @@ describe('MySQL/MariaDB migration tests', () => {
 
     await verifyConnection3.end();
     await superSave3.close();
+  });
+
+  test('MySQL: new tables with filterSortFields use generated columns', async () => {
+    const connectionString = getConnection();
+
+    // Skip if not MySQL
+    if (connectionString.substring(0, 9) === 'sqlite://') {
+      return;
+    }
+
+    const superSave = await SuperSave.create(connectionString);
+
+    const entityWithFilter: EntityDefinition = {
+      ...planetEntity,
+      filterSortFields: {
+        name: 'string',
+        distance: 'number',
+        inhabitable: 'boolean',
+      },
+    };
+
+    const planetRepository: Repository<Planet> =
+      await superSave.addEntity<Planet>(entityWithFilter);
+
+    // Create a planet to ensure table is created
+    await planetRepository.create({
+      name: 'Earth',
+      distance: 100,
+      inhabitable: true,
+    });
+
+    // Verify columns are generated columns
+    const verifyConnection: Connection =
+      await mysql.createConnection(connectionString);
+    const tableName = getTableName(planetEntity.name);
+    const [columns] = (await verifyConnection.query(
+      `SELECT COLUMN_NAME, COLUMN_TYPE, GENERATION_EXPRESSION
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME IN ('name', 'distance', 'inhabitable')`,
+      [tableName]
+    )) as [
+      Array<{
+        COLUMN_NAME: string;
+        COLUMN_TYPE: string;
+        GENERATION_EXPRESSION: string | null;
+      }>,
+      unknown,
+    ];
+
+    // All filterSortFields should be generated columns
+    expect(columns).toHaveLength(3);
+    for (const column of columns) {
+      expect(column.GENERATION_EXPRESSION).toBeTruthy();
+      expect(column.GENERATION_EXPRESSION?.toLowerCase()).toContain(
+        'json_extract'
+      );
+    }
+
+    // Verify filtering still works
+    const query = planetRepository.createQuery();
+    query.eq('name', 'Earth');
+    const results = await planetRepository.getByQuery(query);
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe('Earth');
+
+    await verifyConnection.end();
+    await superSave.close();
   });
 });

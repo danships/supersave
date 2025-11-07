@@ -46,13 +46,7 @@ class MysqlEntityManager extends EntityManager {
       (name: string, namespace?: string) => this.getRepository(name, namespace),
       this.pool
     );
-    await sync(
-      updatedEntity,
-      tableName,
-      this.pool,
-      repository,
-      (name: string, namespace?: string) => this.getRepository(name, namespace)
-    );
+    await sync(updatedEntity, tableName, this.pool, repository);
 
     this.repositories.set(fullEntityName, repository);
     return this.getRepository(entity.name, entity.namespace);
