@@ -24,10 +24,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           npm-version: 'latest'
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=$(echo ${GITHUB_REF} | sed -e 's,^refs/tags/v,,' -e 's,^refs/tags/,,')" >> $GITHUB_OUTPUT
+
+      - name: Update package.json version
+        run: npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -37,13 +44,6 @@ jobs:
 
       - name: Run tests
         run: pnpm test
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Update package.json version
-        run: npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
 
       - name: Determine npm tag
         id: npm_tag
