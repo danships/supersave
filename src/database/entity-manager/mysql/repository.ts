@@ -6,10 +6,8 @@ import type {
   BaseEntity,
   EntityDefinition,
   EntityRow,
-  FilterSortField,
   QueryFilter,
   QuerySort,
-  Relation,
 } from '../../types';
 import { QueryOperatorEnum } from '../../types';
 import type Query from '../query';
@@ -161,7 +159,6 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
   }
 
   public async create(object: Omit<T, 'id'>): Promise<T> {
-    const columns: string[] = ['id', 'contents'];
     const uuid =
       typeof object.id === 'string'
         ? (object.id as string)
@@ -174,55 +171,14 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
         ...this.simplifyRelations(object),
       }),
     ];
-    if (typeof this.definition.filterSortFields !== 'undefined') {
-      // eslint-disable-next-line max-len
-      Object.entries(this.definition.filterSortFields).forEach(
-        ([field, type]: [field: string, type: FilterSortField]) => {
-          if (field === 'id') {
-            return;
-          }
-          columns.push(field);
-          if (type === 'boolean') {
-            values.push(object[field] === true ? 1 : 0);
-          } else if (this.relationsMap.has(field)) {
-            const relation = this.relationsMap.get(field) as Relation;
-            if (Array.isArray(object[field]) && relation.multiple) {
-              // If an filterSortField is a list, store its ids , separated, so we can filter on it using a LIKE.
-              values.push(
-                object[field].map((entity: BaseEntity) => entity.id).join(',')
-              );
-            } else if (relation.multiple) {
-              // Its a list, but no array is set.
-              values.push(null);
-            } else {
-              // Store the individual value.
-              if (typeof object[field] !== 'object') {
-                throw new TypeError(
-                  `The provided relation value for ${field}/${type} is not an object. It should be.`
-                );
-              }
-              values.push(
-                typeof object[field] === 'string'
-                  ? object[field]
-                  : object[field]?.id
-              );
-            }
-          } else if (field !== 'id') {
-            values.push(
-              typeof object[field] !== 'undefined' && object[field] !== null
-                ? object[field]
-                : null
-            );
-          }
-        }
-      );
-    }
 
-    const query = `INSERT INTO ${this.pool.escapeId(this.tableName)} (${columns
-      .map((column: string) => this.pool.escapeId(column))
-      .join(',')}) VALUES(
-      ${columns.map(() => '?')}
-    )`;
+    // Use INSERT ... SET syntax to explicitly set only id and contents
+    // This avoids any issues with generated columns
+    const query = `INSERT INTO ${this.pool.escapeId(
+      this.tableName
+    )} SET ${this.pool.escapeId('id')} = ?, ${this.pool.escapeId(
+      'contents'
+    )} = ?`;
     debug('Generated create query.', query, values);
 
     await executeQuery(this.pool, query, values);
@@ -238,43 +194,6 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     const values: (string | number | boolean | null)[] = [
       JSON.stringify(simplifiedObject),
     ];
-
-    if (typeof this.definition.filterSortFields !== 'undefined') {
-      Object.entries(this.definition.filterSortFields).forEach(
-        ([field, type]: [field: string, type: FilterSortField]) => {
-          if (field === 'id') {
-            return;
-          }
-          if (typeof object[field] !== 'undefined') {
-            columns.push(field);
-            if (type === 'boolean') {
-              values.push(object[field] === true ? 1 : 0);
-            } else if (this.relationsMap.has(field)) {
-              const relation = this.relationsMap.get(field) as Relation;
-              if (Array.isArray(object[field]) && relation.multiple) {
-                // If an filterSortField is a list, store its ids , separated, so we can filter on it using a LIKE.
-                values.push(
-                  object[field].map((entity: BaseEntity) => entity.id).join(',')
-                );
-              } else if (relation.multiple) {
-                // Its a list, but no array is set.
-                values.push(null);
-              } else {
-                // Store the individual value.
-                if (typeof object[field] !== 'object') {
-                  throw new TypeError(
-                    `The provided relation value for ${field}/${type} is not an object. It should be.`
-                  );
-                }
-                values.push(object[field]?.id);
-              }
-            } else {
-              values.push(simplifiedObject[field] || null);
-            }
-          }
-        }
-      );
-    }
 
     const query = `UPDATE ${this.pool.escapeId(this.tableName)} SET
       ${columns.map((column: string) => `${this.pool.escapeId(column)} = ?`)}

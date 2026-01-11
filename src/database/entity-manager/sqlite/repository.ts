@@ -5,10 +5,8 @@ import shortUuid from 'short-uuid';
 import type {
   BaseEntity,
   EntityDefinition,
-  FilterSortField,
   QueryFilter,
   QuerySort,
-  Relation,
 } from '../../types';
 import { QueryOperatorEnum } from '../../types';
 import type Query from '../query';
@@ -142,38 +140,6 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
       }),
     };
 
-    if (typeof this.definition.filterSortFields !== 'undefined') {
-      Object.entries(this.definition.filterSortFields).forEach(
-        ([field, type]: [field: string, type: FilterSortField]) => {
-          columns.push(field);
-          if (type === 'boolean') {
-            valuesObj[field] = object[field] === true ? 1 : 0;
-          } else if (this.relationsMap.has(field)) {
-            const relation = this.relationsMap.get(field) as Relation;
-            if (Array.isArray(object[field]) && relation.multiple) {
-              valuesObj[field] = object[field]
-                .map((entity: BaseEntity) => entity.id)
-                .join(',');
-            } else if (relation.multiple) {
-              valuesObj[field] = null;
-            } else {
-              if (typeof object[field] !== 'object') {
-                throw new TypeError(
-                  `The provided relation value for ${field}/${type} is not an object. It should be.`
-                );
-              }
-              valuesObj[field] = object[field]?.id || null;
-            }
-          } else if (field !== 'id') {
-            valuesObj[field] =
-              typeof object[field] !== 'undefined' && object[field] !== null
-                ? object[field]
-                : null;
-          }
-        }
-      );
-    }
-
     const columnNames = columns
       .map((column: string) => `"${column}"`)
       .join(',');
@@ -199,40 +165,6 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
       contents: JSON.stringify(simplifiedObject),
       id: object.id || '',
     };
-
-    if (typeof this.definition.filterSortFields !== 'undefined') {
-      Object.entries(this.definition.filterSortFields).forEach(
-        ([field, type]: [field: string, type: FilterSortField]) => {
-          if (field === 'id') {
-            return;
-          }
-          if (typeof object[field] !== 'undefined') {
-            columns.push(field);
-            if (type === 'boolean') {
-              valuesObj[field] = object[field] === true ? 1 : 0;
-            } else if (this.relationsMap.has(field)) {
-              const relation = this.relationsMap.get(field) as Relation;
-              if (Array.isArray(simplifiedObject[field]) && relation.multiple) {
-                valuesObj[field] = simplifiedObject[field]
-                  .map((entity: BaseEntity) => entity.id)
-                  .join(',');
-              } else if (relation.multiple) {
-                valuesObj[field] = null;
-              } else {
-                if (typeof object[field] !== 'object') {
-                  throw new TypeError(
-                    `The provided relation value for ${field}/${type} is not an object. It should be.`
-                  );
-                }
-                valuesObj[field] = object[field]?.id || null;
-              }
-            } else {
-              valuesObj[field] = simplifiedObject[field] || null;
-            }
-          }
-        }
-      );
-    }
 
     const setClauses = columns
       .map((column: string) => `"${column}" = ?`)

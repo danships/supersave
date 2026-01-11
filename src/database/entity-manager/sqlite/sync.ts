@@ -20,6 +20,7 @@ type SqlitePragmaColumn = {
   notnull: number;
   type: SqliteType;
   pk: number;
+  hidden: number; // 0 = normal column, 1 = hidden (generated column)
 };
 
 const filterSortFieldSqliteTypeMap = {
@@ -115,6 +116,99 @@ function mapFilterSortFieldsToColumns(
   return result;
 }
 
+/**
+ * Check if a column is a generated column by checking the table definition
+ */
+function isColumnGenerated(
+  connection: Database,
+  tableName: string,
+  columnName: string
+): boolean {
+  // Query sqlite_master to get the table definition
+  const query = `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`;
+  const stmt = connection.prepare(query);
+  const result = stmt.get(tableName) as { sql: string } | undefined;
+
+  if (!result || !result.sql) {
+    return false;
+  }
+
+  // Check if the column definition contains "GENERATED ALWAYS AS"
+  const sql = result.sql;
+  // Find the column definition in the CREATE TABLE statement
+  const columnPattern = new RegExp(
+    `["\`]?${columnName}["\`]?\\s+[^,)]+GENERATED\\s+ALWAYS\\s+AS`,
+    'i'
+  );
+  return columnPattern.test(sql);
+}
+
+/**
+ * Get all column names that are not generated columns
+ */
+function getNonGeneratedColumns(
+  connection: Database,
+  tableName: string,
+  columnNames: string[]
+): string[] {
+  const nonGenerated: string[] = [];
+  for (const columnName of columnNames) {
+    const isGenerated = isColumnGenerated(connection, tableName, columnName);
+    if (!isGenerated) {
+      nonGenerated.push(columnName);
+    }
+  }
+  return nonGenerated;
+}
+
+/**
+ * Create a generated column expression for a filterSortField
+ */
+function createGeneratedColumnExpression(
+  fieldName: string,
+  fieldType: FilterSortField,
+  entity: EntityDefinition
+): string {
+  const jsonPath = `$.${fieldName}`;
+  const relation = entity.relations?.find((rel) => rel.field === fieldName);
+
+  if (relation?.multiple) {
+    // For multiple relations, the JSON stores an array like ["id1", "id2"]
+    // We need to convert it to comma-separated "id1,id2"
+    // SQLite doesn't allow subqueries in generated columns, so we use REPLACE functions
+    // json_extract returns the array as a JSON string like ["id1","id2"]
+    // We remove brackets and quotes, then replace "," with ,
+    const arrayExtract = `json_extract(contents, '${jsonPath}')`;
+    // Remove [ and ], then replace "," with ,, then remove remaining quotes
+    return `REPLACE(REPLACE(REPLACE(REPLACE(${arrayExtract}, '[', ''), ']', ''), '","', ','), '"', '')`;
+  } else if (relation && !relation?.multiple) {
+    // Single relation - just extract the ID string
+    return `json_extract(contents, '${jsonPath}')`;
+  } else if (fieldType === 'boolean') {
+    return `CAST(json_extract(contents, '${jsonPath}') AS INTEGER)`;
+  } else if (fieldType === 'number') {
+    return `CAST(json_extract(contents, '${jsonPath}') AS INTEGER)`;
+  } else {
+    // string
+    return `json_extract(contents, '${jsonPath}')`;
+  }
+}
+
+/**
+ * Get existing indexes for a table
+ */
+function getTableIndexes(connection: Database, tableName: string): string[] {
+  const query = `SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name IS NOT NULL`;
+  const stmt = connection.prepare(query);
+  const result = stmt.all(tableName) as { name: string }[];
+
+  if (!result) {
+    return [];
+  }
+
+  return result.map((row) => row.name);
+}
+
 async function migrateContentsColumn(
   entity: EntityDefinition,
   tableName: string,
@@ -149,8 +243,14 @@ async function migrateContentsColumn(
         }
 
         if (fieldName !== 'id') {
+          const columnType = filterSortFieldSqliteTypeMap[filterSortFieldType];
+          const expression = createGeneratedColumnExpression(
+            fieldName,
+            filterSortFieldType,
+            entity
+          );
           columns.push(
-            `"${fieldName}" ${filterSortFieldSqliteTypeMap[filterSortFieldType]} NULL`
+            `"${fieldName}" ${columnType} GENERATED ALWAYS AS (${expression}) STORED NULL`
           );
           indexes.push(
             `CREATE INDEX IF NOT EXISTS idx_${fieldName} ON ${newTableName}("${fieldName}")`
@@ -210,6 +310,7 @@ export default async (
   getRepository: (name: string, namespace?: string) => BaseRepository<any>
 ): Promise<void> => {
   // First, check if contents column needs migration
+  // migrateContentsColumn will also create generated columns for filterSortFields if they exist
   await migrateContentsColumn(
     entity,
     tableName,
@@ -218,8 +319,8 @@ export default async (
     getRepository
   );
 
-  // If contents was migrated, the table structure is already updated
-  // But we still need to check if filterSortFields need updating
+  // If contents was migrated, the table structure is already updated with generated columns
+  // But we still need to check if filterSortFields need updating (e.g., new fields added)
   if (typeof entity.filterSortFields === 'undefined') {
     return;
   }
@@ -228,17 +329,88 @@ export default async (
   const newSqliteColumns: Record<string, SqliteType> =
     mapFilterSortFieldsToColumns(entity.filterSortFields);
 
-  // Check if filterSortFields changed
-  if (!hasTableChanged(sqliteColumns, newSqliteColumns)) {
-    debug('Table has not changed, not making changes.');
+  // Check if columns need to be migrated to generated columns
+  const filterSortFieldNames = Object.keys(entity.filterSortFields).filter(
+    (name) => name !== 'id'
+  );
+  const nonGeneratedColumns = getNonGeneratedColumns(
+    connection,
+    tableName,
+    filterSortFieldNames
+  );
+
+  // Get expected and existing indexes
+  const expectedIndexColumns = filterSortFieldNames;
+  const existingIndexes = getTableIndexes(connection, tableName);
+
+  // Check which indexes need to be added/removed
+  const indexesToAdd: string[] = [];
+  const indexesToRemove: string[] = [];
+
+  for (const columnName of expectedIndexColumns) {
+    const indexName = `idx_${columnName}`;
+    if (!existingIndexes.includes(indexName)) {
+      indexesToAdd.push(columnName);
+    }
+  }
+
+  // Find indexes that should be removed
+  for (const indexName of existingIndexes) {
+    // Check if this index is for a column that's no longer in filterSortFields
+    if (indexName.startsWith('idx_')) {
+      const columnName = indexName.substring(4); // Remove 'idx_' prefix
+      if (
+        columnName !== 'id' &&
+        columnName !== 'contents' &&
+        !expectedIndexColumns.includes(columnName)
+      ) {
+        indexesToRemove.push(indexName);
+      }
+    }
+  }
+
+  // If only indexes changed and columns are already generated, use CREATE/DROP INDEX
+  // This avoids expensive table recreation when only indexes need updating
+  const columnsChanged = hasTableChanged(sqliteColumns, newSqliteColumns);
+  const needsColumnMigration = nonGeneratedColumns.length > 0;
+
+  if (!columnsChanged && !needsColumnMigration) {
+    // Columns are correct and already generated - only check indexes
+    if (indexesToAdd.length > 0 || indexesToRemove.length > 0) {
+      debug(
+        'Only indexes changed, using CREATE/DROP INDEX statements (no table recreation needed).'
+      );
+
+      // Remove indexes
+      for (const indexName of indexesToRemove) {
+        debug(`Dropping index ${indexName}.`);
+        connection.prepare(`DROP INDEX IF EXISTS ${indexName}`).run();
+      }
+
+      // Add indexes
+      for (const columnName of indexesToAdd) {
+        debug(`Adding index for column ${columnName}.`);
+        connection
+          .prepare(
+            `CREATE INDEX IF NOT EXISTS idx_${columnName} ON ${tableName}("${columnName}")`
+          )
+          .run();
+      }
+    } else {
+      debug('Table has not changed, not making changes.');
+    }
+    // Return early - no table recreation needed
     return;
   }
+
+  // Columns need to be migrated or changed - need table recreation
+  // This only happens when columns actually change, not for index-only changes
+  debug('Columns need migration or change, recreating table.');
 
   const newTableName = `${tableName}_2`;
   const columns = ['id TEXT PRIMARY KEY', 'contents JSON NOT NULL'];
   const indexes = [];
 
-  const filterSortFieldNames: string[] = Object.keys(entity.filterSortFields);
   for (const fieldName of filterSortFieldNames) {
     const filterSortFieldType = entity.filterSortFields[fieldName];
     if (
@@ -247,14 +419,18 @@ export default async (
       throw new TypeError(`Unrecognized field type ${filterSortFieldType}.`);
     }
 
-    if (fieldName !== 'id') {
-      columns.push(
-        `"${fieldName}" ${filterSortFieldSqliteTypeMap[filterSortFieldType]} NULL`
-      );
-      indexes.push(
-        `CREATE INDEX IF NOT EXISTS idx_${fieldName} ON ${newTableName}("${fieldName}")`
-      );
-    }
+    const columnType = filterSortFieldSqliteTypeMap[filterSortFieldType];
+    const expression = createGeneratedColumnExpression(
+      fieldName,
+      filterSortFieldType,
+      entity
+    );
+    columns.push(
+      `"${fieldName}" ${columnType} GENERATED ALWAYS AS (${expression}) STORED NULL`
+    );
+    indexes.push(
+      `CREATE INDEX IF NOT EXISTS idx_${fieldName} ON ${newTableName}("${fieldName}")`
+    );
   }
 
   connection.prepare(`DROP TABLE IF EXISTS ${newTableName};`).run();
