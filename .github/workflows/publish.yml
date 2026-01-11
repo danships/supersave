@@ -3,9 +3,8 @@ name: Publish Package
 on:
   push:
     tags:
-      # Tag filters are globs, not regex.
-      - 'v[0-9]*.[0-9]*.[0-9]*'
-      - 'v[0-9]*.[0-9]*.[0-9]*-*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 jobs:
   publish:
@@ -26,6 +25,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          npm-version: 'latest'
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
