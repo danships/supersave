@@ -529,4 +529,223 @@ describe('MySQL/MariaDB migration tests', () => {
     await verifyConnection.end();
     await superSave.close();
   });
+
+  test('MySQL: boolean field handles JSON boolean, string, and null values', async () => {
+    const connectionString = getConnection();
+
+    // Skip if not MySQL
+    if (connectionString.substring(0, 9) === 'sqlite://') {
+      return;
+    }
+
+    const superSave = await SuperSave.create(connectionString);
+
+    const entityWithFilter: EntityDefinition = {
+      ...planetEntity,
+      filterSortFields: {
+        inhabitable: 'boolean',
+      },
+    };
+
+    const planetRepository: Repository<Planet> =
+      await superSave.addEntity<Planet>(entityWithFilter);
+
+    // Create planets with different boolean representations
+    // JSON boolean true
+    await planetRepository.create({
+      name: 'Earth',
+      inhabitable: true,
+    });
+
+    // JSON boolean false
+    await planetRepository.create({
+      name: 'Mars',
+      inhabitable: false,
+    });
+
+    // Verify the generated column expression uses JSON_TYPE = 'BOOLEAN'
+    const verifyConnection: Connection =
+      await mysql.createConnection(connectionString);
+    const tableName = getTableName(planetEntity.name);
+    const [columns] = (await verifyConnection.query(
+      `SELECT COLUMN_NAME, COLUMN_TYPE, GENERATION_EXPRESSION
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME = 'inhabitable'`,
+      [tableName]
+    )) as [
+      Array<{
+        COLUMN_NAME: string;
+        COLUMN_TYPE: string;
+        GENERATION_EXPRESSION: string | null;
+      }>,
+      unknown,
+    ];
+
+    const inhabitableColumn = columns[0];
+    expect(inhabitableColumn).toBeDefined();
+    expect(inhabitableColumn.GENERATION_EXPRESSION).toBeTruthy();
+    // Verify it uses JSON_TYPE = 'BOOLEAN' (not 'TRUE'/'FALSE')
+    expect(inhabitableColumn.GENERATION_EXPRESSION?.toUpperCase()).toContain(
+      'JSON_TYPE'
+    );
+    // MySQL stores GENERATION_EXPRESSION with escaped quotes, so check for BOOLEAN (without quotes)
+    expect(inhabitableColumn.GENERATION_EXPRESSION?.toUpperCase()).toContain(
+      'BOOLEAN'
+    );
+    // Verify it handles string "true"/"false" via JSON_UNQUOTE
+    expect(inhabitableColumn.GENERATION_EXPRESSION?.toUpperCase()).toContain(
+      'JSON_UNQUOTE'
+    );
+    expect(inhabitableColumn.COLUMN_TYPE.toLowerCase()).toMatch(/^tinyint/);
+
+    // Verify filtering works with boolean values
+    const trueQuery = planetRepository.createQuery();
+    trueQuery.eq('inhabitable', true);
+    const trueResults = await planetRepository.getByQuery(trueQuery);
+    expect(trueResults.length).toBeGreaterThanOrEqual(1);
+    expect(trueResults.some((p) => p.name === 'Earth')).toBe(true);
+
+    const falseQuery = planetRepository.createQuery();
+    falseQuery.eq('inhabitable', false);
+    const falseResults = await planetRepository.getByQuery(falseQuery);
+    expect(falseResults.length).toBeGreaterThanOrEqual(1);
+    expect(falseResults.some((p) => p.name === 'Mars')).toBe(true);
+
+    await verifyConnection.end();
+    await superSave.close();
+  });
+
+  test('MySQL: migration with boolean filterSortField from old table', async () => {
+    const connectionString = getConnection();
+
+    // Skip if not MySQL
+    if (connectionString.substring(0, 9) === 'sqlite://') {
+      return;
+    }
+
+    const connection: Connection =
+      await mysql.createConnection(connectionString);
+    const tableName = getTableName(planetEntity.name);
+
+    // Create table with old LONGTEXT column and a boolean filterSortField column
+    await connection.query(`
+      CREATE TABLE ${connection.escapeId(tableName)} (
+        id VARCHAR(32) PRIMARY KEY,
+        contents LONGTEXT NOT NULL,
+        inhabitable TINYINT(4) NULL
+      )
+    `);
+
+    // Insert test data with boolean values in JSON
+    await connection.query(
+      `INSERT INTO ${connection.escapeId(
+        tableName
+      )} (id, contents, inhabitable) VALUES (?, ?, ?)`,
+      ['earth-id', JSON.stringify({ name: 'Earth', inhabitable: true }), 1]
+    );
+    await connection.query(
+      `INSERT INTO ${connection.escapeId(
+        tableName
+      )} (id, contents, inhabitable) VALUES (?, ?, ?)`,
+      ['mars-id', JSON.stringify({ name: 'Mars', inhabitable: false }), 0]
+    );
+
+    await connection.end();
+
+    // Initialize SuperSave with boolean filterSortField
+    const superSave = await SuperSave.create(connectionString);
+
+    const entityWithFilter: EntityDefinition = {
+      ...planetEntity,
+      filterSortFields: {
+        inhabitable: 'boolean',
+      },
+    };
+
+    const planetRepository: Repository<Planet> =
+      await superSave.addEntity<Planet>(entityWithFilter);
+
+    // Verify migration occurred - inhabitable should be a generated column
+    const verifyConnection: Connection =
+      await mysql.createConnection(connectionString);
+    const [columns] = (await verifyConnection.query(
+      `SELECT COLUMN_NAME, COLUMN_TYPE, DATA_TYPE, GENERATION_EXPRESSION
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME = 'inhabitable'`,
+      [tableName]
+    )) as [
+      Array<{
+        COLUMN_NAME: string;
+        COLUMN_TYPE: string;
+        DATA_TYPE: string;
+        GENERATION_EXPRESSION: string | null;
+      }>,
+      unknown,
+    ];
+
+    const inhabitableColumn = columns[0];
+    expect(inhabitableColumn?.GENERATION_EXPRESSION).toBeTruthy();
+    expect(inhabitableColumn?.GENERATION_EXPRESSION?.toUpperCase()).toContain(
+      'JSON_TYPE'
+    );
+    // MySQL stores GENERATION_EXPRESSION with escaped quotes, so check for BOOLEAN (without quotes)
+    expect(inhabitableColumn?.GENERATION_EXPRESSION?.toUpperCase()).toContain(
+      'BOOLEAN'
+    );
+    expect(inhabitableColumn?.COLUMN_TYPE.toLowerCase()).toMatch(/^tinyint/);
+
+    // Verify data is still accessible and boolean filtering works
+    const planets = await planetRepository.getAll();
+    expect(planets.length).toBeGreaterThanOrEqual(2);
+
+    const earth = planets.find((p) => p.name === 'Earth');
+    const mars = planets.find((p) => p.name === 'Mars');
+
+    expect(earth).toBeDefined();
+    expect(mars).toBeDefined();
+
+    // Test boolean filtering
+    const trueQuery = planetRepository.createQuery();
+    trueQuery.eq('inhabitable', true);
+    const trueResults = await planetRepository.getByQuery(trueQuery);
+    expect(trueResults.some((p) => p.name === 'Earth')).toBe(true);
+
+    const falseQuery = planetRepository.createQuery();
+    falseQuery.eq('inhabitable', false);
+    const falseResults = await planetRepository.getByQuery(falseQuery);
+    expect(falseResults.some((p) => p.name === 'Mars')).toBe(true);
+
+    await verifyConnection.end();
+    await superSave.close();
+  });
+
+  test('MySQL: boolean field rejects invalid field names', async () => {
+    const connectionString = getConnection();
+
+    // Skip if not MySQL
+    if (connectionString.substring(0, 9) === 'sqlite://') {
+      return;
+    }
+
+    const superSave = await SuperSave.create(connectionString);
+
+    // Test with invalid field name containing special characters
+    const entityWithInvalidField: EntityDefinition = {
+      ...planetEntity,
+      filterSortFields: {
+        'invalid-field-name': 'boolean', // Contains hyphen, should be rejected
+      },
+    };
+
+    // This should throw an error when trying to create the generated column
+    await expect(
+      superSave.addEntity<Planet>(entityWithInvalidField)
+    ).rejects.toThrow();
+
+    await superSave.close();
+  });
 });

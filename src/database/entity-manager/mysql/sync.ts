@@ -240,53 +240,60 @@ function mapFilterSortFieldsToColumns(
 }
 
 /**
- * Check if a column is a generated column by checking GENERATION_EXPRESSION
- */
-async function isColumnGenerated(
-  connection: PoolConnection,
-  tableName: string,
-  columnName: string
-): Promise<boolean> {
-  const query = `
-    SELECT GENERATION_EXPRESSION
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = ?
-      AND COLUMN_NAME = ?
-  `;
-  const result = await getQuery<{ GENERATION_EXPRESSION: string | null }>(
-    connection,
-    query,
-    [tableName, columnName]
-  );
-
-  if (result === undefined || result.length === 0) {
-    return false;
-  }
-
-  return result[0].GENERATION_EXPRESSION !== null;
-}
-
-/**
  * Get all column names that are not generated columns
+ * Optimized to fetch all GENERATION_EXPRESSION values in a single query
+ * instead of making N queries (one per column)
  */
 async function getNonGeneratedColumns(
   connection: PoolConnection,
   tableName: string,
   columnNames: string[]
 ): Promise<string[]> {
-  const nonGenerated: string[] = [];
-  for (const columnName of columnNames) {
-    const isGenerated = await isColumnGenerated(
-      connection,
-      tableName,
-      columnName
-    );
-    if (!isGenerated) {
-      nonGenerated.push(columnName);
-    }
+  if (columnNames.length === 0) {
+    return [];
   }
-  return nonGenerated;
+
+  // Fetch all GENERATION_EXPRESSION values for the specified columns in one query
+  const placeholders = columnNames.map(() => '?').join(',');
+  const query = `
+    SELECT COLUMN_NAME, GENERATION_EXPRESSION
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = ?
+      AND COLUMN_NAME IN (${placeholders})
+  `;
+  const result = await getQuery<{
+    COLUMN_NAME: string;
+    GENERATION_EXPRESSION: string | null;
+  }>(connection, query, [tableName, ...columnNames]);
+
+  if (result === undefined) {
+    // If query fails, return all column names (conservative approach)
+    return columnNames;
+  }
+
+  // Create a map of column names to their generation status
+  const generatedColumns = new Set(
+    result
+      .filter((row) => row.GENERATION_EXPRESSION !== null)
+      .map((row) => row.COLUMN_NAME)
+  );
+
+  // Return columns that are not generated
+  return columnNames.filter((columnName) => !generatedColumns.has(columnName));
+}
+
+/**
+ * Validate and sanitize field name to prevent SQL injection and JSON path issues
+ */
+function validateFieldName(fieldName: string): void {
+  // Enforce identifier regex: must start with letter or underscore, followed by letters, digits, or underscores
+  const identifierRegex = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  if (!identifierRegex.test(fieldName)) {
+    throw new Error(
+      `Invalid field name "${fieldName}". Field names must match /^[A-Za-z_][A-Za-z0-9_]*$/`
+    );
+  }
 }
 
 /**
@@ -297,6 +304,9 @@ function createGeneratedColumnExpression(
   fieldType: FilterSortField,
   entity: EntityDefinition
 ): string {
+  // Validate fieldName before using it in JSON paths and SQL expressions
+  validateFieldName(fieldName);
+
   const jsonPath = `$.${fieldName}`;
   const relation = entity.relations?.find((rel) => rel.field === fieldName);
 
@@ -316,14 +326,15 @@ function createGeneratedColumnExpression(
     // We need to convert to 1/0/NULL for the INTEGER column
     const extractExpr = `JSON_EXTRACT(contents, '${jsonPath}')`;
     // Check JSON type and convert accordingly
-    // For JSON boolean: compare directly
-    // For JSON string: unquote and check if it's "true"
+    // For JSON boolean: check JSON_TYPE = 'BOOLEAN' and convert using JSON_UNQUOTE then comparison
+    // MariaDB: JSON_UNQUOTE of a JSON boolean returns the string 'true' or 'false'
+    // For JSON string: unquote and check if it's "true"/"false" (lowercased)
     // For JSON null: return NULL
     return `CASE 
       WHEN JSON_TYPE(${extractExpr}) = 'NULL' THEN NULL
-      WHEN JSON_TYPE(${extractExpr}) = 'TRUE' THEN 1
-      WHEN JSON_TYPE(${extractExpr}) = 'FALSE' THEN 0
+      WHEN JSON_TYPE(${extractExpr}) = 'BOOLEAN' THEN IF(LOWER(JSON_UNQUOTE(${extractExpr})) = 'true', 1, 0)
       WHEN LOWER(JSON_UNQUOTE(${extractExpr})) = 'true' THEN 1
+      WHEN LOWER(JSON_UNQUOTE(${extractExpr})) = 'false' THEN 0
       ELSE 0
     END`;
   } else if (fieldType === 'number') {
