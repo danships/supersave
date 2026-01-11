@@ -150,3 +150,25 @@ the following command to start a jest watch command for the unit tests.
 
 This command uses the `--runInBand` to run all tests synchronously, to prevent the tests from interfering with each other. Each test will drop all tables
 in the database before running, so that they do not interfere with each other.
+
+# Releasing
+
+This package is automatically published to npm when a new git tag is pushed.
+
+## Stable Release
+
+To create a new stable release, create a new git tag with a version number that follows semantic versioning and push it to the repository.
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+## Beta Release
+
+To create a new beta release, create a new git tag with a version number that includes a pre-release identifier and push it to the repository.
+
+```bash
+git tag v1.2.3-beta.1
+git push origin v1.2.3-beta.1
+```
