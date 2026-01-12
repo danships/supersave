@@ -1,9 +1,10 @@
-import express, { type Request, type Response } from 'express';
+import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
   type Collection,
   HookError,
+  type HttpContext,
   type Repository,
   SuperSave,
 } from '../../../../build';
@@ -28,9 +29,7 @@ describe('deleteBefore', () => {
             {
               deleteBefore: (
                 _collection: Collection,
-                _req: Request,
-                _res: Response,
-
+                _ctx: HttpContext,
                 _entity: any
               ) => {
                 throw new HookError('Test message', statusCode);
@@ -39,7 +38,7 @@ describe('deleteBefore', () => {
           ],
         });
       const planet = await planetRepository.create({ name: 'Earth' });
-      app.use('/', await superSave.getRouter());
+      app.use('/', superSave.getNodeHandler());
 
       await supertest(app)
         .delete(`/planets/${planet.id as string}`)

@@ -2,11 +2,11 @@ import type { Database } from 'better-sqlite3';
 import type { Debugger } from 'debug';
 import Debug from 'debug';
 import slug from 'slug';
-import type { BaseEntity, EntityDefinition } from '../../types';
-import EntityManager from '../entity-manager';
-import type BaseRepository from '../repository';
-import Repository from './repository';
-import sync from './sync';
+import type { BaseEntity, EntityDefinition } from '../../types.js';
+import EntityManager from '../entity-manager.js';
+import type BaseRepository from '../repository.js';
+import Repository from './repository.js';
+import sync from './sync.js';
 
 const debug: Debugger = Debug('supersave:db:em:sqlite');
 

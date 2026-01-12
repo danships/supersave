@@ -1,41 +1,86 @@
-import type { Express, Router } from 'express';
-import type Manager from '../manager';
-import type { ManagedCollection } from '../types';
-import * as actions from './actions';
-import { generatePath } from './utils';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createEndpoint, createRouter } from "better-call";
+import { toNodeHandler } from "better-call/node";
+import type Manager from "../manager/index.js";
+import type { ManagedCollection } from "../types.js";
+import * as actions from "./actions/index.js";
+import { generatePath } from "./utils/index.js";
+
+type RouterType = ReturnType<typeof createRouter>;
+type HandlerType = (request: Request) => Promise<Response>;
+type NodeHandlerType = (req: IncomingMessage, res: ServerResponse) => void;
+type EndpointRecord = Record<string, any>;
 
 class Http {
-  public static async create(manager: Manager, prefix: string): Promise<Http> {
-    const requiredExpress = await import('express');
-    // @ts-expect-error Don't what kind of typing we need to give this, this is to keep express an optional dependency.
-    return new Http(requiredExpress, requiredExpress.Router(), manager, prefix);
+  private router!: RouterType;
+
+  public static create(manager: Manager, prefix: string): Http {
+    return new Http(manager, prefix);
   }
 
-  private constructor(
-    private readonly express: Express,
-    private readonly router: Router,
-    private manager: Manager,
-    prefix: string // excuding the /
-  ) {
-    // @ts-expect-error Don't know what kind of typing we need to give the express type import to make this work
-    this.router.use(this.express.json());
-    this.manager.getCollections().forEach((collection: ManagedCollection) => {
-      this.register(collection);
-    });
-    this.router.get(
-      '/',
-      actions.overview(prefix, () => this.getRegisteredCollections())
+  private constructor(private manager: Manager, private prefix: string) {
+    this.buildRouter();
+  }
+
+  private buildRouter(): void {
+    const endpoints: EndpointRecord = {};
+
+    // Add overview endpoint
+    const overviewHandler = actions.overview(this.prefix, () =>
+      this.getRegisteredCollections()
     );
+    endpoints.overview = createEndpoint("/", { method: "GET" }, async () =>
+      overviewHandler()
+    );
+
+    // Add endpoints for each collection
+    this.manager.getCollections().forEach((collection: ManagedCollection) => {
+      const path = generatePath(collection);
+      const safeName = collection.name.replace(/[^a-zA-Z0-9]/g, "_");
+      const namespace = collection.namespace ? `${collection.namespace}_` : "";
+
+      // GET /collection - list items
+      endpoints[`${namespace}${safeName}_get`] = createEndpoint(
+        path,
+        { method: "GET" },
+        actions.get(collection)
+      );
+
+      // POST /collection - create item
+      endpoints[`${namespace}${safeName}_create`] = createEndpoint(
+        path,
+        { method: "POST" },
+        actions.create(collection)
+      );
+
+      // GET /collection/:id - get item by id
+      endpoints[`${namespace}${safeName}_getById`] = createEndpoint(
+        `${path}/:id`,
+        { method: "GET" },
+        actions.getById(collection)
+      );
+
+      // PATCH /collection/:id - update item by id
+      endpoints[`${namespace}${safeName}_updateById`] = createEndpoint(
+        `${path}/:id`,
+        { method: "PATCH" },
+        actions.updateById(collection)
+      );
+
+      // DELETE /collection/:id - delete item by id
+      endpoints[`${namespace}${safeName}_deleteById`] = createEndpoint(
+        `${path}/:id`,
+        { method: "DELETE" },
+        actions.deleteById(collection)
+      );
+    });
+
+    this.router = createRouter(endpoints);
   }
 
-  public register(collection: ManagedCollection<any>): Http {
-    const path = generatePath(collection);
-
-    this.router.get(path, actions.get(collection));
-    this.router.post(path, actions.create(collection));
-    this.router.patch(`${path}/:id`, actions.updateById(collection));
-    this.router.delete(`${path}/:id`, actions.deleteById(collection));
-    this.router.get(`${path}/:id`, actions.getById(collection));
+  public register(_collection: ManagedCollection): Http {
+    // Rebuild the router when a new collection is added
+    this.buildRouter();
     return this;
   }
 
@@ -43,8 +88,20 @@ class Http {
     return this.manager.getCollections();
   }
 
-  public getRouter(): Router {
-    return this.router;
+  /**
+   * Returns the Web Standard Request/Response handler.
+   * Works with Next.js, Bun, Deno, and any environment that supports the Fetch API.
+   */
+  public getHandler(): HandlerType {
+    return this.router.handler;
+  }
+
+  /**
+   * Returns a Node.js http compatible handler.
+   * Works with Node's http.createServer and Express.
+   */
+  public getNodeHandler(): NodeHandlerType {
+    return toNodeHandler(this.router.handler);
   }
 }
 

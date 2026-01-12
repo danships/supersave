@@ -1,7 +1,12 @@
-import express, { type Request, type Response } from 'express';
+import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { type Collection, type Repository, SuperSave } from '../../../../build';
+import {
+  type Collection,
+  type HttpContext,
+  type Repository,
+  SuperSave,
+} from '../../../../build';
 import getConnection from '../../../connection';
 import { planetCollection } from '../../../entities';
 import { clear } from '../../../mysql';
@@ -21,9 +26,7 @@ describe('getById Hook', () => {
           {
             getById: (
               _collection: Collection,
-              _req: Request,
-              _res: Response,
-
+              _ctx: HttpContext,
               entity: any
             ) => {
               return {
@@ -33,8 +36,7 @@ describe('getById Hook', () => {
             },
             entityTransform: (
               _collection: Collection,
-              _req: Request,
-              _res: Response,
+              _ctx: HttpContext,
               entity: any
             ): any => {
               return {
@@ -46,8 +48,7 @@ describe('getById Hook', () => {
           {
             entityTransform: (
               _collection: Collection,
-              _req: Request,
-              _res: Response,
+              _ctx: HttpContext,
               entity: any
             ): any => {
               return {
@@ -59,7 +60,7 @@ describe('getById Hook', () => {
         ],
       });
     const planet = await planetRepository.create({ name: 'Earth' });
-    app.use('/', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const response = await supertest(app)
       .get(`/planets/${planet.id as string}`)

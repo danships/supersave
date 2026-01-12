@@ -1,7 +1,12 @@
-import express, { type Request, type Response } from 'express';
+import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { type Collection, HookError, SuperSave } from '../../../../build';
+import {
+  type Collection,
+  HookError,
+  type HttpContext,
+  SuperSave,
+} from '../../../../build';
 import getConnection from '../../../connection';
 import { planetCollection } from '../../../entities';
 import { clear } from '../../../mysql';
@@ -20,9 +25,7 @@ describe('updateBefore hook', () => {
         {
           updateBefore: (
             _collection: Collection,
-            _req: Request,
-            _res: Response,
-
+            _ctx: HttpContext,
             entity: any
           ): any => {
             return {
@@ -32,8 +35,7 @@ describe('updateBefore hook', () => {
           },
           entityTransform: (
             _collection: Collection,
-            _req: Request,
-            _res: Response,
+            _ctx: HttpContext,
             entity: any
           ): any => {
             return {
@@ -44,13 +46,13 @@ describe('updateBefore hook', () => {
         },
       ],
     });
-    app.use('/api', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
     // create the planet
     const createResponse = await supertest(app)
-      .post('/api/planets')
+      .post('/planets')
       .send(planet)
       .expect('Content-Type', /json/)
       .expect(200);
@@ -58,7 +60,7 @@ describe('updateBefore hook', () => {
 
     // update it
     const updateResponse = await supertest(app)
-      .patch(`/api/planets/${createResponse.body.data.id}`)
+      .patch(`/planets/${createResponse.body.data.id}`)
       .send({ id: planet.id, name: planet.name })
       .expect('Content-Type', /json/)
       .expect(200);
@@ -78,8 +80,7 @@ describe('updateBefore hook', () => {
         {
           updateBefore: (
             _collection: Collection,
-            _req: Request,
-            _res: Response,
+            _ctx: HttpContext,
             _entity: any
           ) => {
             throw new HookError('Test message', 401);
@@ -87,25 +88,25 @@ describe('updateBefore hook', () => {
         },
       ],
     });
-    app.use('/api', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
     // create
     const createResponse = await supertest(app)
-      .post('/api/planets')
+      .post('/planets')
       .send(planet)
       .expect('Content-Type', /json/)
       .expect(200);
 
     // update
     const response = await supertest(app)
-      .patch(`/api/planets/${createResponse.body.data.id}`)
+      .patch(`/planets/${createResponse.body.data.id}`)
       .send({ name: 'Updated planet' })
       .expect('Content-Type', /json/)
       .expect(401);
 
-    expect(response.body).toEqual({ message: 'Test message' });
+    expect(response.body.message).toBe('Test message');
   });
 
   test('the message is copied from the exception', async () => {
@@ -118,8 +119,7 @@ describe('updateBefore hook', () => {
         {
           updateBefore: (
             _collection: Collection,
-            _req: Request,
-            _res: Response,
+            _ctx: HttpContext,
             _entity: any
           ) => {
             throw new HookError('Test message');
@@ -127,22 +127,22 @@ describe('updateBefore hook', () => {
         },
       ],
     });
-    app.use('/api', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
     const createResponse = await supertest(app)
-      .post('/api/planets')
+      .post('/planets')
       .send(planet)
       .expect('Content-Type', /json/)
       .expect(200);
 
     const updateResponse = await supertest(app)
-      .patch(`/api/planets/${createResponse.body.data.id}`)
+      .patch(`/planets/${createResponse.body.data.id}`)
       .send(planet)
       .expect('Content-Type', /json/)
       .expect(500);
 
-    expect(updateResponse.body).toEqual({ message: 'Test message' });
+    expect(updateResponse.body.message).toBe('Test message');
   });
 });

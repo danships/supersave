@@ -15,7 +15,7 @@ test('linking related collections via object', async () => {
 
   await superSave.addCollection<Planet>(planetCollection);
   await superSave.addCollection<Planet>(moonCollection);
-  app.use('/', await superSave.getRouter());
+  app.use('/', superSave.getNodeHandler());
 
   const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
@@ -63,7 +63,7 @@ test('linking related collections via object id', async () => {
 
   await superSave.addCollection<Planet>(planetCollection);
   await superSave.addCollection<Moon>(moonCollection);
-  app.use('/', await superSave.getRouter());
+  app.use('/', superSave.getNodeHandler());
 
   const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
@@ -120,7 +120,7 @@ test('linking related collections via objects', async () => {
       },
     ],
   });
-  app.use('/', await superSave.getRouter());
+  app.use('/', superSave.getNodeHandler());
 
   const jupiter: Omit<Planet, 'id'> = { name: 'Jupiter' };
   const saturn: Omit<Planet, 'id'> = { name: 'Saturn' };
@@ -176,7 +176,7 @@ test('linking related collections via object ids', async () => {
       },
     ],
   });
-  app.use('/', await superSave.getRouter());
+  app.use('/', superSave.getNodeHandler());
 
   const jupiter: Omit<Planet, 'id'> = { name: 'Jupiter' };
   const saturn: Omit<Planet, 'id'> = { name: 'Saturn' };

@@ -8,11 +8,11 @@ import type {
   EntityRow,
   QueryFilter,
   QuerySort,
-} from '../../types';
-import { QueryOperatorEnum } from '../../types';
-import type Query from '../query';
-import BaseRepository from '../repository';
-import { executeQuery, getQuery } from './utils';
+} from '../../types.js';
+import { QueryOperatorEnum } from '../../types.js';
+import type Query from '../query.js';
+import BaseRepository from '../repository.js';
+import { executeQuery, getQuery } from './utils.js';
 
 const debug: Debugger = Debug('supersave:db:mysql:repo');
 

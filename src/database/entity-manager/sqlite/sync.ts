@@ -1,10 +1,10 @@
 import type { Database } from 'better-sqlite3';
 import type { Debugger } from 'debug';
 import Debug from 'debug';
-import type { EntityDefinition, FilterSortField } from '../../types';
-import type BaseRepository from '../repository';
-import { isEqual } from '../utils';
-import Repository from './repository';
+import type { EntityDefinition, FilterSortField } from '../../types.js';
+import type BaseRepository from '../repository.js';
+import { isEqual } from '../utils.js';
+import Repository from './repository.js';
 
 const debug: Debugger = Debug('supersave:db:sync');
 

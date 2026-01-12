@@ -7,10 +7,10 @@ import type {
   EntityDefinition,
   QueryFilter,
   QuerySort,
-} from '../../types';
-import { QueryOperatorEnum } from '../../types';
-import type Query from '../query';
-import BaseRepository from '../repository';
+} from '../../types.js';
+import { QueryOperatorEnum } from '../../types.js';
+import type Query from '../query.js';
+import BaseRepository from '../repository.js';
 
 const debug: Debugger = Debug('supersave:db:sqlite:repo');
 
