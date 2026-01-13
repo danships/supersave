@@ -80,11 +80,13 @@ function filter(
         query.lte(filteredField, value);
         break;
       }
-      case QueryOperatorEnum.IN: {
+
+      // We don't use the enum for in and like, as they are different in the HTTP api than for the Query.
+      case 'in': {
         query.in(filteredField, value.split(','));
         break;
       }
-      case QueryOperatorEnum.LIKE: {
+      case '~': {
         query.like(filteredField, value);
         break;
       }
