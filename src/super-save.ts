@@ -1,11 +1,11 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import CollectionHttp from "./collection/http/index.js";
-import CollectionManager from "./collection/manager/index.js";
-import type { Collection } from "./collection/types.js";
-import type { EntityManager } from "./database/entity-manager/index.js";
-import type Repository from "./database/entity-manager/repository.js";
-import database from "./database/index.js";
-import type { BaseEntity, EntityDefinition } from "./database/types.js";
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import CollectionHttp from './collection/http/index.js';
+import CollectionManager from './collection/manager/index.js';
+import type { Collection } from './collection/types.js';
+import type { EntityManager } from './database/entity-manager/index.js';
+import type Repository from './database/entity-manager/repository.js';
+import database from './database/index.js';
+import type { BaseEntity, EntityDefinition } from './database/types.js';
 
 type HandlerType = (request: Request) => Promise<Response>;
 type NodeHandlerType = (req: IncomingMessage, res: ServerResponse) => void;
@@ -37,7 +37,7 @@ class SuperSave {
     collection: Collection
   ): Promise<Repository<T>> {
     const { filterSortFields = {} } = collection;
-    filterSortFields.id = "string";
+    filterSortFields.id = 'string';
 
     const updatedCollection: Collection = {
       ...collection,
@@ -53,7 +53,7 @@ class SuperSave {
     });
     const managedCollection = { ...updatedCollection, repository };
     this.collectionManager.addCollection(managedCollection);
-    if (typeof this.collectionHttp !== "undefined") {
+    if (typeof this.collectionHttp !== 'undefined') {
       this.collectionHttp.register(managedCollection);
     }
     return repository;
@@ -66,13 +66,13 @@ class SuperSave {
     return this.em.getRepository<T>(entityName, namespace);
   }
 
-  private ensureHttpInitialized(prefix = "/"): CollectionHttp {
+  private ensureHttpInitialized(prefix = '/'): CollectionHttp {
     const normalizedPrefix =
-      prefix.charAt(prefix.length - 1) === "/"
+      prefix.charAt(prefix.length - 1) === '/'
         ? prefix.substring(0, prefix.length - 1)
         : prefix;
 
-    if (typeof this.collectionHttp === "undefined") {
+    if (typeof this.collectionHttp === 'undefined') {
       this.collectionHttp = CollectionHttp.create(
         this.collectionManager,
         normalizedPrefix
@@ -96,7 +96,7 @@ class SuperSave {
    *   return superSave.getHandler()(request);
    * }
    */
-  public getHandler(prefix = "/"): HandlerType {
+  public getHandler(prefix = '/'): HandlerType {
     return this.ensureHttpInitialized(prefix).getHandler();
   }
 
@@ -111,7 +111,7 @@ class SuperSave {
    * // Node HTTP
    * http.createServer(superSave.getNodeHandler()).listen(3000);
    */
-  public getNodeHandler(prefix = "/"): NodeHandlerType {
+  public getNodeHandler(prefix = '/'): NodeHandlerType {
     return this.ensureHttpInitialized(prefix).getNodeHandler();
   }
 

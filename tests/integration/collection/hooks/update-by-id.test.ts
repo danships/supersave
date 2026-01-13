@@ -1,21 +1,21 @@
-import express from "express";
-import supertest from "supertest";
-import { beforeEach, describe, expect, test } from "vitest";
+import express from 'express';
+import supertest from 'supertest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import {
   type Collection,
   HookError,
   type HttpContext,
   SuperSave,
-} from "../../../../build";
-import getConnection from "../../../connection";
-import { planetCollection } from "../../../entities";
-import { clear } from "../../../mysql";
-import type { Planet } from "../../../types";
+} from '../../../../build';
+import getConnection from '../../../connection';
+import { planetCollection } from '../../../entities';
+import { clear } from '../../../mysql';
+import type { Planet } from '../../../types';
 
 beforeEach(clear);
 
-describe("updateBefore hook", () => {
-  test("the hook can manipulate a value.", async () => {
+describe('updateBefore hook', () => {
+  test('the hook can manipulate a value.', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
@@ -30,7 +30,7 @@ describe("updateBefore hook", () => {
           ): any => {
             return {
               ...entity,
-              name: `HOOK-${entity.name ?? ""}`,
+              name: `HOOK-${entity.name ?? ''}`,
             };
           },
           entityTransform: (
@@ -46,15 +46,15 @@ describe("updateBefore hook", () => {
         },
       ],
     });
-    app.use("/", superSave.getNodeHandler());
+    app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, "id"> = { name: "Jupiter" };
+    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
     // create the planet
     const createResponse = await supertest(app)
-      .post("/planets")
+      .post('/planets')
       .send(planet)
-      .expect("Content-Type", /json/)
+      .expect('Content-Type', /json/)
       .expect(200);
     expect(createResponse.body.data.name).toBe(`${planet.name}-TRANSFORM`);
 
@@ -62,7 +62,7 @@ describe("updateBefore hook", () => {
     const updateResponse = await supertest(app)
       .patch(`/planets/${createResponse.body.data.id}`)
       .send({ name: planet.name })
-      .expect("Content-Type", /json/)
+      .expect('Content-Type', /json/)
       .expect(200);
 
     expect(updateResponse.body.data?.name).toBe(
@@ -70,7 +70,7 @@ describe("updateBefore hook", () => {
     );
   });
 
-  test("the statusCode and message are copied from the exception", async () => {
+  test('the statusCode and message are copied from the exception', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
@@ -83,33 +83,33 @@ describe("updateBefore hook", () => {
             _ctx: HttpContext,
             _entity: any
           ) => {
-            throw new HookError("Test message", 401);
+            throw new HookError('Test message', 401);
           },
         },
       ],
     });
-    app.use("/", superSave.getNodeHandler());
+    app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, "id"> = { name: "Jupiter" };
+    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
     // create
     const createResponse = await supertest(app)
-      .post("/planets")
+      .post('/planets')
       .send(planet)
-      .expect("Content-Type", /json/)
+      .expect('Content-Type', /json/)
       .expect(200);
 
     // update
     const response = await supertest(app)
       .patch(`/planets/${createResponse.body.data.id}`)
-      .send({ name: "Updated planet" })
-      .expect("Content-Type", /json/)
+      .send({ name: 'Updated planet' })
+      .expect('Content-Type', /json/)
       .expect(401);
 
-    expect(response.body.message).toBe("Test message");
+    expect(response.body.message).toBe('Test message');
   });
 
-  test("the message is copied from the exception", async () => {
+  test('the message is copied from the exception', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
@@ -122,27 +122,27 @@ describe("updateBefore hook", () => {
             _ctx: HttpContext,
             _entity: any
           ) => {
-            throw new HookError("Test message");
+            throw new HookError('Test message');
           },
         },
       ],
     });
-    app.use("/", superSave.getNodeHandler());
+    app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, "id"> = { name: "Jupiter" };
+    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
     const createResponse = await supertest(app)
-      .post("/planets")
+      .post('/planets')
       .send(planet)
-      .expect("Content-Type", /json/)
+      .expect('Content-Type', /json/)
       .expect(200);
 
     const updateResponse = await supertest(app)
       .patch(`/planets/${createResponse.body.data.id}`)
       .send(planet)
-      .expect("Content-Type", /json/)
+      .expect('Content-Type', /json/)
       .expect(500);
 
-    expect(updateResponse.body.message).toBe("Test message");
+    expect(updateResponse.body.message).toBe('Test message');
   });
 });
