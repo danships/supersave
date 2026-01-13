@@ -1,7 +1,12 @@
-import express, { type Request, type Response } from 'express';
+import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { type Collection, HookError, SuperSave } from '../../../../build';
+import {
+  type Collection,
+  HookError,
+  type HttpContext,
+  SuperSave,
+} from '../../../../build';
 import getConnection from '../../../connection';
 import { planetCollection } from '../../../entities';
 import { clear } from '../../../mysql';
@@ -18,14 +23,15 @@ describe('getHook', () => {
       ...planetCollection,
       hooks: [
         {
-          get: (_collection: Collection, req: Request, _res: Response) => {
-            req.query.id = 'non-existing-id';
+          get: (_collection: Collection, ctx: HttpContext) => {
+            // Modify the query to filter by a non-existing id
+            ctx.query.id = 'non-existing-id';
           },
         },
       ],
     });
     await repository.create({ name: 'Earth' });
-    app.use('/', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const response = await supertest(app)
       .get('/planets')
@@ -47,9 +53,7 @@ describe('getHook', () => {
         {
           entityTransform: (
             _collection: Collection,
-            _req: Request,
-            _res: Response,
-
+            _ctx: HttpContext,
             entity: any
           ): any => {
             return {
@@ -61,7 +65,7 @@ describe('getHook', () => {
       ],
     });
     await repository.create({ name: 'Earth' });
-    app.use('/', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const response = await supertest(app)
       .get('/planets')
@@ -80,20 +84,20 @@ describe('getHook', () => {
       ...planetCollection,
       hooks: [
         {
-          get: (_collection: Collection, _req: Request, _res: Response) => {
+          get: (_collection: Collection, _ctx: HttpContext) => {
             throw new HookError('Test message', 401);
           },
         },
       ],
     });
     await repository.create({ name: 'Earth' });
-    app.use('/', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
 
     const response = await supertest(app)
       .get('/planets')
       .expect('Content-Type', /json/)
       .expect(401);
 
-    expect(response.body).toEqual({ message: 'Test message' });
+    expect(response.body.message).toBe('Test message');
   });
 });

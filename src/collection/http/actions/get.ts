@@ -1,11 +1,10 @@
 import type { Debugger } from 'debug';
 import Debug from 'debug';
-import type { Request, Response } from 'express';
-import type { Query } from '../../../database/entity-manager';
-import type { FilterSortField } from '../../../database/types';
-import { QueryOperatorEnum } from '../../../database/types';
-import type { ManagedCollection } from '../../types';
-import transform from './utils';
+import type { Query } from '../../../database/entity-manager/index.js';
+import type { FilterSortField } from '../../../database/types.js';
+import { QueryOperatorEnum } from '../../../database/types.js';
+import type { HttpContext, ManagedCollection } from '../../types.js';
+import transform from './utils/index.js';
 
 const debug: Debugger = Debug('supersave:http:get');
 
@@ -37,7 +36,6 @@ function filter(
     );
   }
 
-  // eslint-disable-next-line max-len
   const filterSortFields: Record<string, FilterSortField> =
     collection.filterSortFields;
   Object.entries(filters).forEach(([field, value]: [string, string]) => {
@@ -82,6 +80,8 @@ function filter(
         query.lte(filteredField, value);
         break;
       }
+
+      // We don't use the enum for in and like, as they are different in the HTTP api than for the Query.
       case 'in': {
         query.in(filteredField, value.split(','));
         break;
@@ -109,104 +109,106 @@ function limitOffset(query: Query, params: Record<string, string>): void {
   query.offset(parseInt(offset, 10) || 0);
 }
 
-export default (
-  collection: ManagedCollection
-): ((request: Request, res: Response) => Promise<void>) =>
-  // eslint-disable-next-line implicit-arrow-linebreak
-  async (request, res: Response): Promise<void> => {
-    try {
-      // hook
-      for (const hooks of collection.hooks || []) {
-        if (hooks.get) {
-          try {
-            await hooks.get(collection, request, res);
-          } catch (error: unknown) {
-            debug('Error thrown in getHook %o', error);
-            // @ts-expect-error Error has type unknown.
-            const code = error?.statusCode ?? 500;
-            // @ts-expect-error Error has type unknown.
-            res.status(code).json({ message: error.message });
-            return;
-          }
-        }
-      }
+export default (collection: ManagedCollection) =>
+  async (ctx: any): Promise<{ data: unknown[]; meta: unknown }> => {
+    const queryParams = (ctx.query || {}) as Record<string, string>;
 
-      const query: Query = collection.repository.createQuery();
-      if (request.query.sort) {
+    const httpContext: HttpContext = {
+      params: {},
+      query: queryParams,
+      body: {},
+      headers: ctx.headers ?? {},
+      request: ctx.request,
+    };
+
+    // hook
+    for (const hooks of collection.hooks || []) {
+      if (hooks.get) {
         try {
-          sort(query, request.query.sort as string);
-        } catch (error) {
-          res.status(400).json({ message: (error as Error).message });
-          return;
+          await hooks.get(collection, httpContext);
+        } catch (error: unknown) {
+          debug('Error thrown in getHook %o', error);
+          const code = (error as { statusCode?: number })?.statusCode ?? 500;
+          const status =
+            code === 400
+              ? 'BAD_REQUEST'
+              : code === 401
+                ? 'UNAUTHORIZED'
+                : code === 403
+                  ? 'FORBIDDEN'
+                  : code === 404
+                    ? 'NOT_FOUND'
+                    : 'INTERNAL_SERVER_ERROR';
+          throw ctx.error(status, { message: (error as Error).message });
         }
       }
+    }
 
-      const filters: Record<string, string> = {};
-
-      Object.entries(request.query as Record<string, any>).forEach(
-        ([field, value]: [string, any]) => {
-          if (field === 'sort' || field === 'limit' || field === 'offset') {
-            return;
-          }
-
-          // Express by default parses values as ?distance[>]=0 into { distance: { '>': 0 }}. Unless 'the query parser'
-          // setting is set the 'simple' on app., then its always a string.
-          if (typeof value === 'string') {
-            filters[field] = value;
-          } else if (typeof value === 'object') {
-            Object.entries(value).forEach(
-              ([operator, filterValue]: [string, any]) => {
-                filters[`${field}[${operator}]`] = `${filterValue}`;
-              }
-            );
-          } else {
-            debug('Ignoring query parameter', field, value);
-          }
-        }
-      );
-
+    const query: Query = collection.repository.createQuery();
+    if (queryParams.sort) {
       try {
-        filter(collection, query, filters);
+        sort(query, queryParams.sort);
       } catch (error) {
-        res.status(400).json({ message: (error as Error).message });
+        throw ctx.error('BAD_REQUEST', { message: (error as Error).message });
+      }
+    }
+
+    const filters: Record<string, string> = {};
+
+    Object.entries(queryParams).forEach(([field, value]: [string, string]) => {
+      if (field === 'sort' || field === 'limit' || field === 'offset') {
         return;
       }
+      filters[field] = value;
+    });
 
-      try {
-        limitOffset(query, request.query as Record<string, any>);
-        let items = await collection.repository.getByQuery(query);
-
-        // transform hook
-        try {
-          items = await Promise.all(
-            items.map(async (item) => transform(collection, request, res, item))
-          );
-        } catch (error: unknown) {
-          debug('Error thrown in get transform %o', error);
-          // @ts-expect-error Error has type unknown.
-          const code = error?.statusCode ?? 500;
-          // @ts-expect-error Error has type unknown.
-          res.status(code).json({ message: error.message });
-          return;
-        }
-
-        res.json({
-          data: items,
-          meta: {
-            sort: query.getSort(),
-            limit: query.getLimit(),
-            filters: query.getWhere(),
-            offset: query.getOffset(),
-          },
-        });
-      } catch (error) {
-        debug('Unexpected error while querying collection.', error);
-        res
-          .status(500)
-          .json({ message: 'An unexpected error occurred, try again later.' });
-      }
+    try {
+      filter(collection, query, filters);
     } catch (error) {
-      debug('Error while fetching items. Query: %o, %o', request.query, error);
-      res.status(500).json({ message: (error as Error).message });
+      throw ctx.error('BAD_REQUEST', { message: (error as Error).message });
+    }
+
+    try {
+      limitOffset(query, queryParams);
+      let items = await collection.repository.getByQuery(query);
+
+      // transform hook
+      try {
+        items = (await Promise.all(
+          items.map(async (item) => transform(collection, httpContext, item))
+        )) as typeof items;
+      } catch (error: unknown) {
+        debug('Error thrown in get transform %o', error);
+        const code = (error as { statusCode?: number })?.statusCode ?? 500;
+        const status =
+          code === 400
+            ? 'BAD_REQUEST'
+            : code === 401
+              ? 'UNAUTHORIZED'
+              : code === 403
+                ? 'FORBIDDEN'
+                : code === 404
+                  ? 'NOT_FOUND'
+                  : 'INTERNAL_SERVER_ERROR';
+        throw ctx.error(status, { message: (error as Error).message });
+      }
+
+      return {
+        data: items,
+        meta: {
+          sort: query.getSort(),
+          limit: query.getLimit(),
+          filters: query.getWhere(),
+          offset: query.getOffset(),
+        },
+      };
+    } catch (error) {
+      debug('Unexpected error while querying collection.', error);
+      if ((error as { status?: unknown })?.status) {
+        throw error; // Re-throw API errors
+      }
+      throw ctx.error('INTERNAL_SERVER_ERROR', {
+        message: 'An unexpected error occurred, try again later.',
+      });
     }
   };

@@ -3,8 +3,8 @@ import type {
   QueryFilter,
   QueryFilterValue,
   QuerySort,
-} from '../types';
-import { QueryOperatorEnum } from '../types';
+} from '../types.js';
+import { QueryOperatorEnum } from '../types.js';
 
 class Query {
   private where: QueryFilter[] = [];

@@ -1,5 +1,5 @@
 // import { Repository } from "../../database/EntityManager";
-import type { ManagedCollection } from '../types';
+import type { ManagedCollection } from '../types.js';
 
 class Manager {
   private collections: Map<string, ManagedCollection<any>>;

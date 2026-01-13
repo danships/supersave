@@ -20,7 +20,7 @@ const appForFilter: () => Promise<[express.Application, SuperSave]> =
         filterSortFields: { name: 'string', distance: 'number' },
       });
 
-    app.use('/', await superSave.getRouter());
+    app.use('/', superSave.getNodeHandler());
     await repository.create({ name: 'Mars', distance: 0 });
     await repository.create({ name: 'Earth', distance: 1000 });
     await repository.create({ name: 'Jupiter', distance: 2500 });

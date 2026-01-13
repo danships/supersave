@@ -1,13 +1,20 @@
-import type { Request, Response } from 'express';
-import type { Repository } from '../database/entity-manager';
-import type { FilterSortField, Relation } from '../database/types';
+import type { Repository } from '../database/entity-manager/index.js';
+import type { FilterSortField, Relation } from '../database/types.js';
+
+export type HttpContext = {
+  params: Record<string, string>;
+  query: Record<string, string>;
+  body: unknown;
+  headers: Record<string, string>;
+  request?: Request;
+};
 
 export type HttpCollection = {
   name: string;
   description?: string;
   endpoint: string;
 
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type Collection = {
@@ -15,52 +22,43 @@ export type Collection = {
   description?: string;
   namespace?: string;
 
-  template: any;
+  template: unknown;
   relations: Relation[];
   filterSortFields?: Record<string, FilterSortField>;
 
-  additionalProperties?: Record<string, any>;
+  additionalProperties?: Record<string, unknown>;
   hooks?: Hooks[];
 };
 
-export interface ManagedCollection<T = any> extends Collection {
+export interface ManagedCollection<T = unknown> extends Collection {
   repository: Repository<T>;
 }
 
 export type Hooks = {
-  get?: (
-    collection: Collection,
-    request: Request,
-    res: Response
-  ) => Promise<void> | void;
+  get?: (collection: Collection, ctx: HttpContext) => Promise<void> | void;
   getById?: <T>(
     collection: Collection,
-    request: Request,
-    res: Response,
+    ctx: HttpContext,
     entity: T | null
   ) => Promise<T> | T;
   entityTransform?: <IN, OUT>(
     collection: Collection,
-    request: Request,
-    res: Response,
+    ctx: HttpContext,
     entity: IN
   ) => Promise<OUT> | OUT;
   updateBefore?: <IN, OUT>(
     collection: Collection,
-    request: Request,
-    res: Response,
+    ctx: HttpContext,
     entity: Partial<IN>
   ) => Promise<OUT> | OUT;
   createBefore?: <IN, OUT>(
     collection: Collection,
-    request: Request,
-    res: Response,
+    ctx: HttpContext,
     entity: Omit<IN, 'id'>
   ) => Promise<OUT> | OUT;
   deleteBefore?: <T>(
     collection: Collection,
-    request: Request,
-    res: Response,
-    item: Omit<T, 'id'> | null
+    ctx: HttpContext,
+    item: T | null
   ) => Promise<void> | void;
 };

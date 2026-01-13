@@ -1,12 +1,11 @@
-import type { Request, RequestHandler, Response } from 'express';
-import type { HttpCollection, ManagedCollection } from '../../types';
-import { generatePath } from '../utils';
+import type { HttpCollection, ManagedCollection } from '../../types.js';
+import { generatePath } from '../utils/index.js';
 
 export default (
-  prefix: string, // without a trailing /
+  prefix: string,
   getRegisteredCollections: () => ManagedCollection[]
-): RequestHandler =>
-  (_request: Request, res: Response): void => {
+) =>
+  (): { data: HttpCollection[] | Record<string, HttpCollection[]> } => {
     const output: { [key: string]: HttpCollection[] } = {};
 
     const collections = getRegisteredCollections();
@@ -31,9 +30,8 @@ export default (
       Object.keys(output).length === 1 &&
       typeof output['/'] !== 'undefined'
     ) {
-      res.json({ data: output['/'] });
-      return;
+      return { data: output['/'] };
     }
 
-    res.json({ data: output });
+    return { data: output };
   };

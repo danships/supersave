@@ -1,83 +1,113 @@
 import type { Debugger } from 'debug';
 import Debug from 'debug';
-import type { Request, Response } from 'express';
-import type { ManagedCollection } from '../../types';
-import transform from './utils';
+import type { HttpContext, ManagedCollection } from '../../types.js';
+import transform from './utils/index.js';
 
 const debug: Debugger = Debug('supersave:http:create');
 
-export default (
-  collection: ManagedCollection
-): ((request: Request, res: Response) => Promise<void>) =>
-  // eslint-disable-next-line implicit-arrow-linebreak
-  async (request, res: Response): Promise<void> => {
-    try {
-      const { body } = request;
-      if (typeof body !== 'object') {
-        throw new TypeError('Request body is not an object.');
-      }
-      collection.relations.forEach((relation) => {
-        if (body[relation.field]) {
-          if (relation.multiple && !Array.isArray(body[relation.field])) {
-            throw new Error(
-              `Attribute ${relation.field} is a relation for multiple entities, but no array is provided.`
-            );
-          } else if (relation.multiple) {
-            if (body[relation.field][0] === 'string') {
-              body[relation.field] = body[relation.field].map((id: string) => ({
-                id,
-              }));
-            }
-          } else if (!relation.multiple) {
-            if (typeof body[relation.field] === 'string') {
-              body[relation.field] = {
-                id: body[relation.field],
-              };
-            }
-          }
-        }
+export default (collection: ManagedCollection) =>
+  async (ctx: any): Promise<{ data: unknown }> => {
+    const body = ctx.body as Record<string, unknown>;
+
+    if (typeof body !== 'object' || body === null) {
+      throw ctx.error('BAD_REQUEST', {
+        message: 'Request body is not an object.',
       });
+    }
 
-      let item: any;
-      let itemBody = body;
-
-      for (const hooks of collection.hooks || []) {
-        if (hooks.createBefore) {
-          // hook
-          try {
-            itemBody = await hooks.createBefore(
-              collection,
-              request,
-              res,
-              itemBody
-            );
-          } catch (error) {
-            debug('Error thrown in createBeforeHook %o', error);
-            // @ts-expect-error Error has type unknown.
-            const code = error?.statusCode ?? 500;
-            // @ts-expect-error Error has type unknown.
-            res.status(code).json({ message: error.message });
-            return;
+    collection.relations.forEach((relation) => {
+      if (body[relation.field]) {
+        if (relation.multiple && !Array.isArray(body[relation.field])) {
+          throw ctx.error('BAD_REQUEST', {
+            message: `Attribute ${relation.field} is a relation for multiple entities, but no array is provided.`,
+          });
+        } else if (relation.multiple) {
+          const fieldValue = body[relation.field] as unknown[];
+          if (typeof fieldValue[0] === 'string') {
+            body[relation.field] = fieldValue.map((id: unknown) => ({
+              id,
+            }));
+          }
+        } else if (!relation.multiple) {
+          if (typeof body[relation.field] === 'string') {
+            body[relation.field] = {
+              id: body[relation.field],
+            };
           }
         }
       }
-      item = await collection.repository.create(itemBody);
-      debug('Created collection item at', request.path);
+    });
+
+    let item: unknown;
+    let itemBody = body;
+
+    const httpContext: HttpContext = {
+      params: {},
+      query: {},
+      body,
+      headers: ctx.headers ?? {},
+      request: ctx.request,
+    };
+
+    for (const hooks of collection.hooks || []) {
+      if (hooks.createBefore) {
+        try {
+          itemBody = (await hooks.createBefore(
+            collection,
+            httpContext,
+            itemBody
+          )) as Record<string, unknown>;
+        } catch (error) {
+          debug('Error thrown in createBeforeHook %o', error);
+          const code = (error as { statusCode?: number })?.statusCode ?? 500;
+          const status =
+            code === 400
+              ? 'BAD_REQUEST'
+              : code === 401
+                ? 'UNAUTHORIZED'
+                : code === 403
+                  ? 'FORBIDDEN'
+                  : code === 404
+                    ? 'NOT_FOUND'
+                    : 'INTERNAL_SERVER_ERROR';
+          throw ctx.error(status, { message: (error as Error).message });
+        }
+      }
+    }
+
+    try {
+      item = await collection.repository.create(
+        itemBody as Parameters<typeof collection.repository.create>[0]
+      );
+      debug('Created collection item');
 
       // transform hook
       try {
-        item = await transform(collection, request, res, item);
+        item = await transform(collection, httpContext, item);
       } catch (error: unknown) {
         debug('Error thrown in create transformHook %o', error);
-
-        const code = (error as any)?.statusCode ?? 500;
-        res.status(code).json({ message: (error as Error).message });
-        return;
+        const code = (error as { statusCode?: number })?.statusCode ?? 500;
+        const status =
+          code === 400
+            ? 'BAD_REQUEST'
+            : code === 401
+              ? 'UNAUTHORIZED'
+              : code === 403
+                ? 'FORBIDDEN'
+                : code === 404
+                  ? 'NOT_FOUND'
+                  : 'INTERNAL_SERVER_ERROR';
+        throw ctx.error(status, { message: (error as Error).message });
       }
 
-      res.json({ data: item });
+      return { data: item };
     } catch (error) {
       debug('Error while storing item. %o', error);
-      res.status(500).json({ message: (error as Error).message });
+      if ((error as { status?: unknown })?.status) {
+        throw error; // Re-throw API errors
+      }
+      throw ctx.error('INTERNAL_SERVER_ERROR', {
+        message: (error as Error).message,
+      });
     }
   };

@@ -3,8 +3,8 @@ import type {
   EntityDefinition,
   EntityRow,
   Relation,
-} from '../types';
-import Query from './query';
+} from '../types.js';
+import Query from './query.js';
 
 export default abstract class Repository<T> {
   protected relationFields: string[];
