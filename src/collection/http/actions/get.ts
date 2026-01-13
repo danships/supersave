@@ -1,22 +1,22 @@
-import type { Debugger } from 'debug';
-import Debug from 'debug';
-import type { Query } from '../../../database/entity-manager/index.js';
-import type { FilterSortField } from '../../../database/types.js';
-import { QueryOperatorEnum } from '../../../database/types.js';
-import type { HttpContext, ManagedCollection } from '../../types.js';
-import transform from './utils/index.js';
+import type { Debugger } from "debug";
+import Debug from "debug";
+import type { Query } from "../../../database/entity-manager/index.js";
+import type { FilterSortField } from "../../../database/types.js";
+import { QueryOperatorEnum } from "../../../database/types.js";
+import type { HttpContext, ManagedCollection } from "../../types.js";
+import transform from "./utils/index.js";
 
-const debug: Debugger = Debug('supersave:http:get');
+const debug: Debugger = Debug("supersave:http:get");
 
 function sort(query: Query, sortRequest: string): void {
-  const sorts = sortRequest.split(',');
+  const sorts = sortRequest.split(",");
   sorts.forEach((sortField: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
+    let direction: "asc" | "desc" = "asc";
     let parsedSortField = sortField;
 
-    if (sortField.startsWith('-')) {
+    if (sortField.startsWith("-")) {
       parsedSortField = sortField.substring(1);
-      direction = 'desc';
+      direction = "desc";
     }
     query.sort(parsedSortField, direction);
   });
@@ -32,20 +32,20 @@ function filter(
   }
   if (!collection.filterSortFields) {
     throw new Error(
-      'There are no fields available to filter on, while filters were provided.'
+      "There are no fields available to filter on, while filters were provided."
     );
   }
 
   const filterSortFields: Record<string, FilterSortField> =
     collection.filterSortFields;
   Object.entries(filters).forEach(([field, value]: [string, string]) => {
-    const matches: string[] | null = (field || '').match(/(.*)\[(.*)\]$/);
+    const matches: string[] | null = (field || "").match(/(.*)\[(.*)\]$/);
     if (matches === null || matches.length !== 3) {
       if (
         collection.filterSortFields &&
-        collection.filterSortFields[field] === 'boolean'
+        collection.filterSortFields[field] === "boolean"
       ) {
-        query.eq(field, ['1', 1, 'true', true].includes(value));
+        query.eq(field, ["1", 1, "true", true].includes(value));
       } else {
         query.eq(field, value);
       }
@@ -80,11 +80,11 @@ function filter(
         query.lte(filteredField, value);
         break;
       }
-      case 'in': {
-        query.in(filteredField, value.split(','));
+      case "in": {
+        query.in(filteredField, value.split(","));
         break;
       }
-      case '~': {
+      case "~": {
         query.like(filteredField, value);
         break;
       }
@@ -97,8 +97,8 @@ function filter(
 }
 
 function limitOffset(query: Query, params: Record<string, string>): void {
-  const { limit = '25', offset = '0' } = params;
-  if (limit === '-1') {
+  const { limit = "25", offset = "0" } = params;
+  if (limit === "-1") {
     query.limit(undefined);
   } else {
     query.limit(parseInt(limit, 10) || 25);
@@ -115,7 +115,7 @@ export default (collection: ManagedCollection) =>
       params: {},
       query: queryParams,
       body: {},
-      headers: {},
+      headers: ctx.headers ?? {},
       request: ctx.request,
     };
 
@@ -125,18 +125,18 @@ export default (collection: ManagedCollection) =>
         try {
           await hooks.get(collection, httpContext);
         } catch (error: unknown) {
-          debug('Error thrown in getHook %o', error);
+          debug("Error thrown in getHook %o", error);
           const code = (error as { statusCode?: number })?.statusCode ?? 500;
           const status =
             code === 400
-              ? 'BAD_REQUEST'
+              ? "BAD_REQUEST"
               : code === 401
-                ? 'UNAUTHORIZED'
-                : code === 403
-                  ? 'FORBIDDEN'
-                  : code === 404
-                    ? 'NOT_FOUND'
-                    : 'INTERNAL_SERVER_ERROR';
+              ? "UNAUTHORIZED"
+              : code === 403
+              ? "FORBIDDEN"
+              : code === 404
+              ? "NOT_FOUND"
+              : "INTERNAL_SERVER_ERROR";
           throw ctx.error(status, { message: (error as Error).message });
         }
       }
@@ -147,14 +147,14 @@ export default (collection: ManagedCollection) =>
       try {
         sort(query, queryParams.sort);
       } catch (error) {
-        throw ctx.error('BAD_REQUEST', { message: (error as Error).message });
+        throw ctx.error("BAD_REQUEST", { message: (error as Error).message });
       }
     }
 
     const filters: Record<string, string> = {};
 
     Object.entries(queryParams).forEach(([field, value]: [string, string]) => {
-      if (field === 'sort' || field === 'limit' || field === 'offset') {
+      if (field === "sort" || field === "limit" || field === "offset") {
         return;
       }
       filters[field] = value;
@@ -163,7 +163,7 @@ export default (collection: ManagedCollection) =>
     try {
       filter(collection, query, filters);
     } catch (error) {
-      throw ctx.error('BAD_REQUEST', { message: (error as Error).message });
+      throw ctx.error("BAD_REQUEST", { message: (error as Error).message });
     }
 
     try {
@@ -176,18 +176,18 @@ export default (collection: ManagedCollection) =>
           items.map(async (item) => transform(collection, httpContext, item))
         )) as typeof items;
       } catch (error: unknown) {
-        debug('Error thrown in get transform %o', error);
+        debug("Error thrown in get transform %o", error);
         const code = (error as { statusCode?: number })?.statusCode ?? 500;
         const status =
           code === 400
-            ? 'BAD_REQUEST'
+            ? "BAD_REQUEST"
             : code === 401
-              ? 'UNAUTHORIZED'
-              : code === 403
-                ? 'FORBIDDEN'
-                : code === 404
-                  ? 'NOT_FOUND'
-                  : 'INTERNAL_SERVER_ERROR';
+            ? "UNAUTHORIZED"
+            : code === 403
+            ? "FORBIDDEN"
+            : code === 404
+            ? "NOT_FOUND"
+            : "INTERNAL_SERVER_ERROR";
         throw ctx.error(status, { message: (error as Error).message });
       }
 
@@ -201,12 +201,12 @@ export default (collection: ManagedCollection) =>
         },
       };
     } catch (error) {
-      debug('Unexpected error while querying collection.', error);
+      debug("Unexpected error while querying collection.", error);
       if ((error as { status?: unknown })?.status) {
         throw error; // Re-throw API errors
       }
-      throw ctx.error('INTERNAL_SERVER_ERROR', {
-        message: 'An unexpected error occurred, try again later.',
+      throw ctx.error("INTERNAL_SERVER_ERROR", {
+        message: "An unexpected error occurred, try again later.",
       });
     }
   };

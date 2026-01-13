@@ -1,10 +1,10 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createEndpoint, createRouter } from 'better-call';
-import { toNodeHandler } from 'better-call/node';
-import type Manager from '../manager/index.js';
-import type { ManagedCollection } from '../types.js';
-import * as actions from './actions/index.js';
-import { generatePath } from './utils/index.js';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createEndpoint, createRouter } from "better-call";
+import { toNodeHandler } from "better-call/node";
+import type Manager from "../manager/index.js";
+import type { ManagedCollection } from "../types.js";
+import * as actions from "./actions/index.js";
+import { generatePath } from "./utils/index.js";
 
 type RouterType = ReturnType<typeof createRouter>;
 type HandlerType = (request: Request) => Promise<Response>;
@@ -18,10 +18,7 @@ class Http {
     return new Http(manager, prefix);
   }
 
-  private constructor(
-    private manager: Manager,
-    private prefix: string
-  ) {
+  private constructor(private manager: Manager, private prefix: string) {
     this.buildRouter();
   }
 
@@ -32,48 +29,59 @@ class Http {
     const overviewHandler = actions.overview(this.prefix, () =>
       this.getRegisteredCollections()
     );
-    endpoints.overview = createEndpoint('/', { method: 'GET' }, async () =>
+    endpoints.overview = createEndpoint("/", { method: "GET" }, async () =>
       overviewHandler()
     );
 
     // Add endpoints for each collection
     this.manager.getCollections().forEach((collection: ManagedCollection) => {
       const path = generatePath(collection);
-      const safeName = collection.name.replace(/[^a-zA-Z0-9]/g, '_');
-      const namespace = collection.namespace ? `${collection.namespace}_` : '';
+      // Use char code encoding to preserve uniqueness and prevent collisions
+      const safeName = collection.name.replace(
+        /[^a-zA-Z0-9]/g,
+        (char) => `_${char.charCodeAt(0)}_`
+      );
+      const namespace = collection.namespace ? `${collection.namespace}_` : "";
+
+      const baseKey = `${namespace}${safeName}`;
+      if (endpoints[`${baseKey}_get`]) {
+        throw new Error(
+          `Endpoint key collision detected for collection "${collection.name}"`
+        );
+      }
 
       // GET /collection - list items
-      endpoints[`${namespace}${safeName}_get`] = createEndpoint(
+      endpoints[`${baseKey}_get`] = createEndpoint(
         path,
-        { method: 'GET' },
+        { method: "GET" },
         actions.get(collection)
       );
 
       // POST /collection - create item
-      endpoints[`${namespace}${safeName}_create`] = createEndpoint(
+      endpoints[`${baseKey}_create`] = createEndpoint(
         path,
-        { method: 'POST' },
+        { method: "POST" },
         actions.create(collection)
       );
 
       // GET /collection/:id - get item by id
-      endpoints[`${namespace}${safeName}_getById`] = createEndpoint(
+      endpoints[`${baseKey}_getById`] = createEndpoint(
         `${path}/:id`,
-        { method: 'GET' },
+        { method: "GET" },
         actions.getById(collection)
       );
 
       // PATCH /collection/:id - update item by id
-      endpoints[`${namespace}${safeName}_updateById`] = createEndpoint(
+      endpoints[`${baseKey}_updateById`] = createEndpoint(
         `${path}/:id`,
-        { method: 'PATCH' },
+        { method: "PATCH" },
         actions.updateById(collection)
       );
 
       // DELETE /collection/:id - delete item by id
-      endpoints[`${namespace}${safeName}_deleteById`] = createEndpoint(
+      endpoints[`${baseKey}_deleteById`] = createEndpoint(
         `${path}/:id`,
-        { method: 'DELETE' },
+        { method: "DELETE" },
         actions.deleteById(collection)
       );
     });

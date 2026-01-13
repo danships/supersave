@@ -1,5 +1,5 @@
-import type { Repository } from '../database/entity-manager/index.js';
-import type { FilterSortField, Relation } from '../database/types.js';
+import type { Repository } from "../database/entity-manager/index.js";
+import type { FilterSortField, Relation } from "../database/types.js";
 
 export type HttpContext = {
   params: Record<string, string>;
@@ -54,11 +54,11 @@ export type Hooks = {
   createBefore?: <IN, OUT>(
     collection: Collection,
     ctx: HttpContext,
-    entity: Omit<IN, 'id'>
+    entity: Omit<IN, "id">
   ) => Promise<OUT> | OUT;
   deleteBefore?: <T>(
     collection: Collection,
     ctx: HttpContext,
-    item: Omit<T, 'id'> | null
+    item: T | null
   ) => Promise<void> | void;
 };
