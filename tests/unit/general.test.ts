@@ -80,7 +80,7 @@ test('entity delete', async () => {
 
   const earth: Planet = await planetRepository.create({ name: 'Earth' });
   await planetRepository.create({ name: 'Mars' });
-  // @ts-ignore
+  // @ts-expect-error
   await planetRepository.deleteUsingId(earth.id as string);
 
   const remainingEarths = await planetRepository.getAll();

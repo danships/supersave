@@ -129,8 +129,7 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
 
   public async create(object: T): Promise<T> {
     const columns: string[] = ['id', 'contents'];
-    const uuid =
-      typeof object.id === 'string' ? object.id : generate();
+    const uuid = typeof object.id === 'string' ? object.id : generate();
 
     const valuesObj: Record<string, string | number | null> = {
       id: uuid,

@@ -160,9 +160,7 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
 
   public async create(object: Omit<T, 'id'>): Promise<T> {
     const uuid =
-      typeof object.id === 'string'
-        ? (object.id as string)
-        : generate();
+      typeof object.id === 'string' ? (object.id as string) : generate();
 
     const values: (string | number | null)[] = [
       uuid,
