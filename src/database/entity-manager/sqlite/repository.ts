@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import type { Debugger } from 'debug';
 import Debug from 'debug';
-import shortUuid from 'short-uuid';
+import { generate } from 'short-uuid';
 import type {
   BaseEntity,
   EntityDefinition,
@@ -129,8 +129,7 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
 
   public async create(object: T): Promise<T> {
     const columns: string[] = ['id', 'contents'];
-    const uuid =
-      typeof object.id === 'string' ? object.id : shortUuid.generate();
+    const uuid = typeof object.id === 'string' ? object.id : generate();
 
     const valuesObj: Record<string, string | number | null> = {
       id: uuid,
