@@ -1,7 +1,7 @@
 import type { Debugger } from 'debug';
 import Debug from 'debug';
 import type { Pool } from 'mysql2/promise';
-import shortUuid from 'short-uuid';
+import { generate } from 'short-uuid';
 import type {
   BaseEntity,
   EntityDefinition,
@@ -162,7 +162,7 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     const uuid =
       typeof object.id === 'string'
         ? (object.id as string)
-        : shortUuid.generate();
+        : generate();
 
     const values: (string | number | null)[] = [
       uuid,
