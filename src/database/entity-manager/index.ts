@@ -1,7 +1,5 @@
-import type { Database } from 'better-sqlite3';
 import type { Debugger } from 'debug';
 import Debug from 'debug';
-import type { Pool } from 'mysql2/promise';
 import EntityManager from './entity-manager.js';
 import type { MysqlOptions } from './mysql/connection.js';
 import Query from './query.js';
@@ -41,12 +39,15 @@ export default async (
   if (type === 'sqlite') {
     const sqliteModule = await import('./sqlite/index.js');
     const connectionModule = await import('./sqlite/connection.js');
+    type SqliteConnection = Awaited<
+      ReturnType<typeof import('./sqlite/connection.js')['default']>
+    >;
     const Sqlite = getDefaultExport(sqliteModule) as unknown as new (
-      conn: Database
+      conn: SqliteConnection
     ) => EntityManager;
     const createConnection = getDefaultExport(connectionModule) as unknown as (
       file: string
-    ) => Database;
+    ) => SqliteConnection;
     debug('Setting up connection for', options);
     const conn = createConnection((options as SqliteOptions).file);
     return new Sqlite(conn);
@@ -54,12 +55,15 @@ export default async (
   if (type === 'mysql') {
     const mysqlModule = await import('./mysql/index.js');
     const connectionModule = await import('./mysql/connection.js');
+    type MysqlConnection = Awaited<
+      ReturnType<typeof import('./mysql/connection.js')['default']>
+    >;
     const Mysql = getDefaultExport(mysqlModule) as unknown as new (
-      pool: Pool
+      pool: MysqlConnection
     ) => EntityManager;
     const createPool = getDefaultExport(connectionModule) as unknown as (
       conn: string
-    ) => Promise<Pool>;
+    ) => Promise<MysqlConnection>;
     debug('Setting up connection for mysql.');
     const conn = await createPool((options as MysqlOptions).connection);
     return new Mysql(conn);
