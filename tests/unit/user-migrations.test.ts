@@ -21,7 +21,10 @@ test('migration execution and tracking', async () => {
   expect(migration2Run).toHaveBeenCalledTimes(1);
 
   // Check if it's recorded
-  const recorded = await (ss as any).em.executeRaw('SELECT name FROM _supersave_migrations WHERE name = ?', ['m1']);
+  const recorded = await (ss as any).em.executeRaw(
+    'SELECT name FROM _supersave_migrations WHERE name = ?',
+    ['m1']
+  );
   expect(recorded).toHaveLength(1);
   expect(recorded[0].name).toBe('m1');
 
@@ -38,7 +41,9 @@ test('engine specific migrations', async () => {
   ];
 
   const connectionString = getConnection();
-  const engineType = connectionString.startsWith('sqlite://') ? 'sqlite' : 'mysql';
+  const engineType = connectionString.startsWith('sqlite://')
+    ? 'sqlite'
+    : 'mysql';
 
   const ss = await SuperSave.create(connectionString, { migrations });
 
@@ -71,7 +76,7 @@ test('skipSync option', async () => {
     name: 'test_skip_sync',
     template: { name: 'string' },
     relations: [],
-    filterSortFields: { name: 'string' }
+    filterSortFields: { name: 'string' },
   };
 
   // @ts-expect-error - testing with partial entity
@@ -85,7 +90,7 @@ test('skipSync option', async () => {
     expect(nameColumn).toBeUndefined();
   } else if (connectionString.startsWith('mysql://')) {
     const pool = ss.getConnection<any>();
-    const [columns] = await pool.query("SHOW COLUMNS FROM test_skip_sync");
+    const [columns] = await pool.query('SHOW COLUMNS FROM test_skip_sync');
     const nameColumn = (columns as any[]).find((c: any) => c.Field === 'name');
     expect(nameColumn).toBeUndefined();
   }

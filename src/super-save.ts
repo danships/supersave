@@ -51,7 +51,7 @@ class SuperSave {
     return ss;
   }
 
-  private async runMigrations(): Promise<void> {
+  public async runMigrations(): Promise<void> {
     const migrations = this.options.migrations;
     if (!migrations || migrations.length === 0) {
       return;
@@ -62,34 +62,28 @@ class SuperSave {
     // Ensure _supersave_migrations table exists
     const createTableSql =
       engineType === 'mysql'
-        ? 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name VARCHAR(255) PRIMARY KEY)'
+        ? 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name VARCHAR(255) PRIMARY KEY, UNIQUE(name))'
         : 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name TEXT PRIMARY KEY)';
 
     await this.em.executeRaw(createTableSql);
 
-    // Fetch executed migrations
-    const executedMigrationsRaw = await this.em.executeRaw(
-      'SELECT name FROM _supersave_migrations'
-    );
-    const executedMigrations = new Set(
-      executedMigrationsRaw.map((row: { name: string }) => row.name)
-    );
-
     for (const migration of migrations) {
-      if (executedMigrations.has(migration.name)) {
-        continue;
-      }
-
       if (migration.engine && migration.engine !== engineType) {
         continue;
       }
 
-      await migration.run(this);
+      const insertSql =
+        engineType === 'mysql'
+          ? 'INSERT IGNORE INTO _supersave_migrations (name) VALUES (?)'
+          : 'INSERT OR IGNORE INTO _supersave_migrations (name) VALUES (?)';
 
-      await this.em.executeRaw(
-        'INSERT INTO _supersave_migrations (name) VALUES (?)',
-        [migration.name]
-      );
+      const result = await this.em.executeRaw(insertSql, [migration.name]);
+      const affectedRows =
+        engineType === 'mysql' ? result.affectedRows : result.changes;
+
+      if (affectedRows > 0) {
+        await migration.run(this);
+      }
     }
   }
 

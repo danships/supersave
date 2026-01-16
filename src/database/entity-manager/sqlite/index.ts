@@ -60,15 +60,15 @@ class SqliteEntityManager extends EntityManager {
     return 'sqlite';
   }
 
-  public async executeRaw(sql: string, params: any[] = []): Promise<any> {
+  public executeRaw(sql: string, params: any[] = []): Promise<any> {
     const stmt = this.connection.prepare(sql);
     if (
       sql.trim().toLowerCase().startsWith('select') ||
       sql.trim().toLowerCase().startsWith('pragma')
     ) {
-      return stmt.all(params);
+      return Promise.resolve(stmt.all(params));
     }
-    return stmt.run(params);
+    return Promise.resolve(stmt.run(params));
   }
 
   protected createTable(tableName: string): Promise<void> {
