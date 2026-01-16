@@ -234,6 +234,57 @@ curl -X DELETE http://localhost:3000/planets/abc123
 curl "http://localhost:3000/planets?sort=-name&limit=10&distance[>]=100"
 ```
 
+# Migrations
+
+SuperSave includes a migration system that allows you to run custom code when the application starts. This is useful for seeding data, updating existing records, or performing any other initialization tasks.
+
+## Registration
+
+You can register migrations when creating a `SuperSave` instance by providing them in the `SuperSaveOptions`.
+
+```typescript
+import { SuperSave, Migration } from "supersave";
+
+const migrations: Migration[] = [
+  {
+    name: 'seed-planets',
+    run: async (ss) => {
+      const planetRepo = ss.getRepository('planet');
+      await planetRepo.create({ name: 'Earth' });
+      await planetRepo.create({ name: 'Mars' });
+    }
+  },
+  {
+    name: 'mysql-specific-init',
+    engine: 'mysql',
+    run: async (ss) => {
+      // This will only run when using a MySQL connection
+      await (ss as any).em.executeRaw('CREATE INDEX idx_custom ON some_table(some_column)');
+    }
+  }
+];
+
+const superSave = await SuperSave.create(connectionString, { migrations });
+```
+
+## Options
+
+The `SuperSave.create` method accepts a `SuperSaveOptions` object as the second argument:
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `migrations` | `Migration[]` | An array of migration objects to be executed. |
+| `skipMigrations` | `boolean` | If `true`, the migration runner will be skipped entirely. |
+| `skipSync` | `boolean` | If `true`, the automatic schema synchronization for entities will be skipped. |
+
+## Execution and Tracking
+
+- Migrations are tracked in a `_supersave_migrations` table in your database.
+- Each migration is executed only once.
+- Migrations are executed in the order they are provided in the `migrations` array.
+- If a migration has an `engine` specified ('mysql' or 'sqlite'), it will only run if the current database connection matches that engine.
+- The `run` function receives the `SuperSave` instance, allowing you to use repositories or perform raw queries.
+
 # Hooks
 
 There are several hooks available that can be used to manipulate the behavior in the HTTP endpoints:

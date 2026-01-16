@@ -10,6 +10,18 @@ import type { BaseEntity, EntityDefinition } from './database/types.js';
 type HandlerType = (request: Request) => Promise<Response>;
 type NodeHandlerType = (req: IncomingMessage, res: ServerResponse) => void;
 
+export interface Migration {
+  name: string;
+  run: (ss: SuperSave) => Promise<void>;
+  engine?: 'mysql' | 'sqlite';
+}
+
+export interface SuperSaveOptions {
+  migrations?: Migration[];
+  skipSync?: boolean;
+  skipMigrations?: boolean;
+}
+
 class SuperSave {
   private collectionManager: CollectionManager;
 
@@ -17,20 +29,68 @@ class SuperSave {
 
   private initializedPrefix?: string;
 
-  private constructor(private em: EntityManager) {
+  private constructor(
+    private em: EntityManager,
+    private options: SuperSaveOptions = {}
+  ) {
     this.collectionManager = new CollectionManager();
   }
 
-  public static async create(connectionString: string): Promise<SuperSave> {
+  public static async create(
+    connectionString: string,
+    options: SuperSaveOptions = {}
+  ): Promise<SuperSave> {
     const em = await database(connectionString);
 
-    return new SuperSave(em);
+    const ss = new SuperSave(em, options);
+
+    if (!options.skipMigrations) {
+      await ss.runMigrations();
+    }
+
+    return ss;
+  }
+
+  public async runMigrations(): Promise<void> {
+    const migrations = this.options.migrations;
+    if (!migrations || migrations.length === 0) {
+      return;
+    }
+
+    const engineType = this.em.getEngineType();
+
+    // Ensure _supersave_migrations table exists
+    const createTableSql =
+      engineType === 'mysql'
+        ? 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name VARCHAR(255) PRIMARY KEY, UNIQUE(name))'
+        : 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name TEXT PRIMARY KEY)';
+
+    await this.em.executeRaw(createTableSql);
+
+    for (const migration of migrations) {
+      if (migration.engine && migration.engine !== engineType) {
+        continue;
+      }
+
+      const insertSql =
+        engineType === 'mysql'
+          ? 'INSERT IGNORE INTO _supersave_migrations (name) VALUES (?)'
+          : 'INSERT OR IGNORE INTO _supersave_migrations (name) VALUES (?)';
+
+      const result = await this.em.executeRaw(insertSql, [migration.name]);
+      const affectedRows =
+        engineType === 'mysql' ? result.affectedRows : result.changes;
+
+      if (affectedRows > 0) {
+        await migration.run(this);
+      }
+    }
   }
 
   public addEntity<T extends BaseEntity>(
     entity: EntityDefinition
   ): Promise<Repository<T>> {
-    return this.em.addEntity<T>(entity);
+    return this.em.addEntity<T>(entity, { skipSync: this.options.skipSync });
   }
 
   public async addCollection<T extends BaseEntity>(
