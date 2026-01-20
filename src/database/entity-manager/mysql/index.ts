@@ -60,11 +60,6 @@ class MysqlEntityManager extends EntityManager {
     return 'mysql';
   }
 
-  public async executeRaw(sql: string, params: any[] = []): Promise<any> {
-    const [results] = await this.pool.query(sql, params);
-    return results;
-  }
-
   protected createTable(tableName: string): Promise<void> {
     debug(`Creating table ${tableName}.`);
 

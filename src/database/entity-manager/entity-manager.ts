@@ -18,8 +18,6 @@ abstract class EntityManager {
 
   public abstract getEngineType(): 'mysql' | 'sqlite';
 
-  public abstract executeRaw(sql: string, params?: any[]): Promise<any>;
-
   protected getFullEntityName(name: string, namespace?: string): string {
     return typeof namespace !== 'undefined' ? `${namespace}_${name}` : name;
   }

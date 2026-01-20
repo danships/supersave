@@ -19,7 +19,6 @@ export interface Migration {
 export interface SuperSaveOptions {
   migrations?: Migration[];
   skipSync?: boolean;
-  skipMigrations?: boolean;
 }
 
 class SuperSave {
@@ -42,13 +41,7 @@ class SuperSave {
   ): Promise<SuperSave> {
     const em = await database(connectionString);
 
-    const ss = new SuperSave(em, options);
-
-    if (!options.skipMigrations) {
-      await ss.runMigrations();
-    }
-
-    return ss;
+    return new SuperSave(em, options);
   }
 
   public async runMigrations(): Promise<void> {
@@ -65,24 +58,38 @@ class SuperSave {
         ? 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name VARCHAR(255) PRIMARY KEY, UNIQUE(name))'
         : 'CREATE TABLE IF NOT EXISTS _supersave_migrations (name TEXT PRIMARY KEY)';
 
-    await this.em.executeRaw(createTableSql);
+    const insertSql =
+      engineType === 'mysql'
+        ? 'INSERT IGNORE INTO _supersave_migrations (name) VALUES (?)'
+        : 'INSERT OR IGNORE INTO _supersave_migrations (name) VALUES (?)';
 
-    for (const migration of migrations) {
-      if (migration.engine && migration.engine !== engineType) {
-        continue;
+    if (engineType === 'mysql') {
+      const pool = this.em.getConnection();
+      await pool.query(createTableSql);
+
+      for (const migration of migrations) {
+        if (migration.engine && migration.engine !== engineType) {
+          continue;
+        }
+
+        const [result] = await pool.query(insertSql, [migration.name]);
+        if ((result as any).affectedRows > 0) {
+          await migration.run(this);
+        }
       }
+    } else {
+      const db = this.em.getConnection();
+      db.exec(createTableSql);
 
-      const insertSql =
-        engineType === 'mysql'
-          ? 'INSERT IGNORE INTO _supersave_migrations (name) VALUES (?)'
-          : 'INSERT OR IGNORE INTO _supersave_migrations (name) VALUES (?)';
+      for (const migration of migrations) {
+        if (migration.engine && migration.engine !== engineType) {
+          continue;
+        }
 
-      const result = await this.em.executeRaw(insertSql, [migration.name]);
-      const affectedRows =
-        engineType === 'mysql' ? result.affectedRows : result.changes;
-
-      if (affectedRows > 0) {
-        await migration.run(this);
+        const result = db.prepare(insertSql).run(migration.name);
+        if (result.changes > 0) {
+          await migration.run(this);
+        }
       }
     }
   }
