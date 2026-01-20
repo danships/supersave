@@ -234,6 +234,61 @@ curl -X DELETE http://localhost:3000/planets/abc123
 curl "http://localhost:3000/planets?sort=-name&limit=10&distance[>]=100"
 ```
 
+# Migrations
+
+SuperSave includes a migration system that allows you to run custom code when the application starts. This is useful for seeding data, updating existing records, or performing any other initialization tasks.
+
+## Registration
+
+You can register migrations when creating a `SuperSave` instance by providing them in the `SuperSaveOptions`.
+
+```typescript
+import { SuperSave, Migration } from "supersave";
+
+const migrations: Migration[] = [
+  {
+    name: 'seed-planets',
+    run: async (ss) => {
+      const planetRepo = ss.getRepository('planet');
+      await planetRepo.create({ name: 'Earth' });
+      await planetRepo.create({ name: 'Mars' });
+    }
+  },
+  {
+    name: 'mysql-specific-init',
+    engine: 'mysql',
+    run: async (ss) => {
+      // This will only run when using a MySQL connection
+      // Use getConnection() for raw SQL queries
+      const pool = ss.getConnection<Pool>();
+      await pool.query('CREATE INDEX idx_custom ON some_table(some_column)');
+    }
+  }
+];
+
+const superSave = await SuperSave.create(connectionString, { migrations });
+```
+
+## Options
+
+The `SuperSave.create` method accepts a `SuperSaveOptions` object as the second argument:
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `migrations` | `Migration[]` | An array of migration objects to be executed. |
+| `skipSync` | `boolean` | If `true`, the automatic schema synchronization for entities will be skipped. |
+
+## Execution and Tracking
+
+- Migrations are tracked in a `_supersave_migrations` table in your database.
+- Each migration is executed only once.
+- Migrations are executed in the order they are provided in the `migrations` array.
+- If a migration has an `engine` specified ('mysql' or 'sqlite'), it will only run if the current database connection matches that engine.
+- The `run` function receives the `SuperSave` instance, allowing you to use repositories or perform raw queries via `getConnection()`.
+
+You are yourself responsible for invoking runMigrations() after creating the SuperSave instance. This is because only you can make
+sure that the required entities are created and available before running the migrations.
+
 # Hooks
 
 There are several hooks available that can be used to manipulate the behavior in the HTTP endpoints:
@@ -324,7 +379,7 @@ in the API output, with the JSON payload containing the message.
 
 ## Access the native connection
 
-The `SuperSave` class offers a function `getConnection()`that returns the underlying connection. This can be used to perform
+The `SuperSave` class offers a function `getConnection()` that returns the underlying connection. This can be used to perform
 custom queries.
 
 | Connection | Description                                                                                                  |
@@ -334,6 +389,20 @@ custom queries.
 
 In typescript, the `getConnection<T>()` provides a generic type, which you can use to set the
 expected return type from the function. You are yourself responsible for the correct type.
+
+### Example: Running raw SQL queries
+
+```typescript
+// MySQL
+import type { Pool } from 'mysql2/promise';
+const pool = superSave.getConnection<Pool>();
+const [rows] = await pool.query('SELECT * FROM my_table WHERE id = ?', [id]);
+
+// SQLite
+import type { Database } from 'better-sqlite3';
+const db = superSave.getConnection<Database>();
+const rows = db.prepare('SELECT * FROM my_table WHERE id = ?').all(id);
+```
 
 # Development
 

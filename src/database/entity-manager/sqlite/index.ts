@@ -3,7 +3,7 @@ import type { Debugger } from 'debug';
 import Debug from 'debug';
 import slug from 'slug';
 import type { BaseEntity, EntityDefinition } from '../../types.js';
-import EntityManager from '../entity-manager.js';
+import EntityManager, { type AddEntityOptions } from '../entity-manager.js';
 import type BaseRepository from '../repository.js';
 import Repository from './repository.js';
 import sync from './sync.js';
@@ -16,7 +16,8 @@ class SqliteEntityManager extends EntityManager {
   }
 
   public async addEntity<T extends BaseEntity>(
-    entity: EntityDefinition
+    entity: EntityDefinition,
+    options: AddEntityOptions = {}
   ): Promise<BaseRepository<T>> {
     const { filterSortFields = {} } = entity;
     filterSortFields.id = 'string';
@@ -39,16 +40,24 @@ class SqliteEntityManager extends EntityManager {
       (name: string, namespace?: string) => this.getRepository(name, namespace),
       this.connection
     );
-    await sync(
-      updatedEntity,
-      tableName,
-      this.connection,
-      repository,
-      (name: string, namespace?: string) => this.getRepository(name, namespace)
-    );
+
+    if (!options.skipSync) {
+      await sync(
+        updatedEntity,
+        tableName,
+        this.connection,
+        repository,
+        (name: string, namespace?: string) =>
+          this.getRepository(name, namespace)
+      );
+    }
 
     this.repositories.set(fullEntityName, repository);
     return this.getRepository(entity.name, entity.namespace);
+  }
+
+  public getEngineType(): 'mysql' | 'sqlite' {
+    return 'sqlite';
   }
 
   protected createTable(tableName: string): Promise<void> {

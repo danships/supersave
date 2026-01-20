@@ -7,7 +7,7 @@ import type {
   EntityDefinition,
   FilterSortField,
 } from '../../types.js';
-import EntityManager from '../entity-manager.js';
+import EntityManager, { type AddEntityOptions } from '../entity-manager.js';
 import type BaseRepository from '../repository.js';
 import Repository from './repository.js';
 import sync from './sync.js';
@@ -21,7 +21,8 @@ class MysqlEntityManager extends EntityManager {
   }
 
   public async addEntity<T extends BaseEntity>(
-    entity: EntityDefinition
+    entity: EntityDefinition,
+    options: AddEntityOptions = {}
   ): Promise<BaseRepository<T>> {
     const filterSortFields: Record<string, FilterSortField> = {
       ...(entity.filterSortFields ?? {}),
@@ -46,10 +47,17 @@ class MysqlEntityManager extends EntityManager {
       (name: string, namespace?: string) => this.getRepository(name, namespace),
       this.pool
     );
-    await sync(updatedEntity, tableName, this.pool, repository);
+
+    if (!options.skipSync) {
+      await sync(updatedEntity, tableName, this.pool, repository);
+    }
 
     this.repositories.set(fullEntityName, repository);
     return this.getRepository(entity.name, entity.namespace);
+  }
+
+  public getEngineType(): 'mysql' | 'sqlite' {
+    return 'mysql';
   }
 
   protected createTable(tableName: string): Promise<void> {
