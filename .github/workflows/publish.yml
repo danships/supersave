@@ -1,17 +1,14 @@
 name: Publish Package
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  release:
+    types: [published]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,17 +21,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          npm-version: 'latest'
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'pnpm'
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          cache: "pnpm"
 
-      - name: Get version from tag
+      - name: Get version from release tag
         id: get_version
-        run: echo "VERSION=$(echo ${GITHUB_REF} | sed -e 's,^refs/tags/v,,' -e 's,^refs/tags/,,')" >> $GITHUB_OUTPUT
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: echo "VERSION=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Update package.json version
-        run: npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: npm version --no-git-tag-version --allow-same-version "$VERSION"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -47,12 +47,51 @@ jobs:
 
       - name: Determine npm tag
         id: npm_tag
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          if [[ "${{ steps.get_version.outputs.VERSION }}" =~ - ]]; then
-            echo "TAG=beta" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" =~ - ]]; then
+            echo "TAG=beta" >> "$GITHUB_OUTPUT"
+            echo "IS_BETA=true" >> "$GITHUB_OUTPUT"
           else
-            echo "TAG=latest" >> $GITHUB_OUTPUT
+            echo "TAG=latest" >> "$GITHUB_OUTPUT"
+            echo "IS_BETA=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish to npm
-        run: npm publish --tag ${{ steps.npm_tag.outputs.TAG }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ steps.npm_tag.outputs.TAG }}
+        run: npm publish --tag "$NPM_TAG"
+
+      - name: Update package.json version on main
+        if: steps.npm_tag.outputs.IS_BETA == 'false'
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Unshallow the repository so git merge-base works reliably
+          # (actions/checkout uses shallow clone by default)
+          git fetch --prune --unshallow origin main || git fetch --prune origin main
+
+          # Verify the release commit is related to main (either an ancestor or descendant)
+          # This prevents bumping main from releases made on unrelated branches
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" origin/main && ! git merge-base --is-ancestor origin/main "$RELEASE_SHA"; then
+            echo "::warning::Release commit is not related to main branch, skipping version bump"
+            exit 0
+          fi
+
+          git checkout main
+          npm version --no-git-tag-version --allow-same-version "$VERSION"
+          git add package.json
+
+          # Only commit and push if there are staged changes
+          if git diff --cached --quiet; then
+            echo "No changes to package.json, skipping commit"
+          else
+            git commit -m "chore: bump version to $VERSION"
+            git push origin main
+          fi

@@ -419,22 +419,28 @@ in the database before running, so that they do not interfere with each other.
 
 # Releasing
 
-This package is automatically published to npm when a new git tag is pushed.
+This package is automatically published to npm when a new GitHub release is published. The version is determined by the release tag.
 
 ## Stable Release
 
-To create a new stable release, create a new git tag with a version number that follows semantic versioning and push it to the repository.
+To create a new stable release:
 
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
+1. Go to the [Releases page](../../releases) on GitHub
+2. Click "Create a new release"
+3. Create a new tag with a version number following semantic versioning (e.g., `v1.2.3`)
+4. Fill in the release title and description
+5. Click "Publish release"
+
+The workflow will automatically update `package.json` on the main branch to match the released version.
 
 ## Beta Release
 
-To create a new beta release, create a new git tag with a version number that includes a pre-release identifier and push it to the repository.
+To create a new beta release:
 
-```bash
-git tag v1.2.3-beta.1
-git push origin v1.2.3-beta.1
-```
+1. Go to the [Releases page](../../releases) on GitHub
+2. Click "Create a new release"
+3. Create a new tag with a pre-release identifier (e.g., `v1.2.3-beta.1`)
+4. Check "Set as a pre-release"
+5. Click "Publish release"
+
+Beta releases are published to npm with the `beta` tag and do not update `package.json` on main.
