@@ -27,10 +27,14 @@ jobs:
 
       - name: Get version from release tag
         id: get_version
-        run: echo "VERSION=$(echo ${{ github.event.release.tag_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: echo "VERSION=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Update package.json version
-        run: npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: npm version --no-git-tag-version --allow-same-version "$VERSION"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -43,28 +47,48 @@ jobs:
 
       - name: Determine npm tag
         id: npm_tag
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
         run: |
-          if [[ "${{ steps.get_version.outputs.VERSION }}" =~ - ]]; then
-            echo "TAG=beta" >> $GITHUB_OUTPUT
-            echo "IS_BETA=true" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" =~ - ]]; then
+            echo "TAG=beta" >> "$GITHUB_OUTPUT"
+            echo "IS_BETA=true" >> "$GITHUB_OUTPUT"
           else
-            echo "TAG=latest" >> $GITHUB_OUTPUT
-            echo "IS_BETA=false" >> $GITHUB_OUTPUT
+            echo "TAG=latest" >> "$GITHUB_OUTPUT"
+            echo "IS_BETA=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish to npm
-        run: npm publish --tag ${{ steps.npm_tag.outputs.TAG }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ steps.npm_tag.outputs.TAG }}
+        run: npm publish --tag "$NPM_TAG"
 
       - name: Update package.json version on main
         if: steps.npm_tag.outputs.IS_BETA == 'false'
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+
+          # Verify the release commit is related to main (either an ancestor or descendant)
+          # This prevents bumping main from releases made on unrelated branches
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" origin/main && ! git merge-base --is-ancestor origin/main "$RELEASE_SHA"; then
+            echo "::warning::Release commit is not related to main branch, skipping version bump"
+            exit 0
+          fi
+
           git checkout main
-          npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
+          npm version --no-git-tag-version --allow-same-version "$VERSION"
           git add package.json
-          git commit -m "chore: bump version to ${{ steps.get_version.outputs.VERSION }}"
-          git push origin main
+
+          # Only commit and push if there are staged changes
+          if git diff --cached --quiet; then
+            echo "No changes to package.json, skipping commit"
+          else
+            git commit -m "chore: bump version to $VERSION"
+            git push origin main
+          fi
