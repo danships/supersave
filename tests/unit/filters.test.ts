@@ -4,11 +4,11 @@ import {
   type EntityDefinition,
   type Query,
   SuperSave,
-} from '../../build';
-import getConnection from '../connection';
-import { planetEntity } from '../entities';
-import { clear } from '../mysql';
-import type { Planet } from '../types';
+} from '../../dist/index.js';
+import getConnection from '../connection.js';
+import { planetEntity } from '../entities.js';
+import { clear } from '../mysql.js';
+import type { Planet } from '../types.js';
 
 beforeEach(clear);
 

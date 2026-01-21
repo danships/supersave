@@ -2,11 +2,11 @@ import http from 'node:http';
 import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { type Repository, SuperSave } from '../../../../build';
-import getConnection from '../../../connection';
-import { planetCollection } from '../../../entities';
-import { clear } from '../../../mysql';
-import type { Planet } from '../../../types';
+import { type Repository, SuperSave } from '../../../../dist/index.js';
+import getConnection from '../../../connection.js';
+import { planetCollection } from '../../../entities.js';
+import { clear } from '../../../mysql.js';
+import type { Planet } from '../../../types.js';
 
 beforeEach(clear);
 

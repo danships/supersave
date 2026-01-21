@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { SuperSave } from '../../build';
-import getConnection from '../connection';
+import { SuperSave } from '../../dist/index.js';
+import getConnection from '../connection.js';
 
 test('get-connection returns something', async () => {
   const superSave = await SuperSave.create(getConnection());

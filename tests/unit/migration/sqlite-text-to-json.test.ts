@@ -7,9 +7,9 @@ import {
   type EntityDefinition,
   type Repository,
   SuperSave,
-} from '../../../build';
-import { planetEntity } from '../../entities';
-import type { Planet } from '../../types';
+} from '../../../dist/index.js';
+import { planetEntity } from '../../entities.js';
+import type { Planet } from '../../types.js';
 
 // Helper function to create an old SQLite database with TEXT column
 function createOldSqliteDatabase(filePath: string): void {

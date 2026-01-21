@@ -6,11 +6,11 @@ import {
   HookError,
   type HttpContext,
   SuperSave,
-} from '../../../../build';
-import getConnection from '../../../connection';
-import { planetCollection } from '../../../entities';
-import { clear } from '../../../mysql';
-import type { Planet } from '../../../types';
+} from '../../../../dist/index.js';
+import getConnection from '../../../connection.js';
+import { planetCollection } from '../../../entities.js';
+import { clear } from '../../../mysql.js';
+import type { Planet } from '../../../types.js';
 
 beforeEach(clear);
 

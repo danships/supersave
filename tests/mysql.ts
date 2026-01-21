@@ -1,5 +1,5 @@
 import mysql, { type Connection } from 'mysql2/promise';
-import getConnection from './connection';
+import getConnection from './connection.js';
 
 export const clear = async (): Promise<void> => {
   const connectionString = getConnection();

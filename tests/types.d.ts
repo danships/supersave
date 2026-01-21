@@ -1,4 +1,4 @@
-import { BaseEntity } from '../build';
+import { BaseEntity } from '../dist/index.js';
 
 export interface Planet extends BaseEntity {
   id: string;
