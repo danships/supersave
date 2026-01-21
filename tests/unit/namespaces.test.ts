@@ -1,5 +1,9 @@
 import { beforeEach, expect, test } from 'vitest';
-import { type EntityDefinition, type Repository, SuperSave } from '../../dist/index.js';
+import {
+  type EntityDefinition,
+  type Repository,
+  SuperSave,
+} from '../../dist/index.js';
 import getConnection from '../connection.js';
 import { moonEntity, planetEntity } from '../entities.js';
 import { clear } from '../mysql.js';

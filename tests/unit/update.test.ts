@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { type BaseEntity, type Repository, SuperSave } from '../../dist/index.js';
+import {
+  type BaseEntity,
+  type Repository,
+  SuperSave,
+} from '../../dist/index.js';
 import getConnection from '../connection.js';
 import { planetEntity } from '../entities.js';
 import { clear } from '../mysql.js';
