@@ -2,7 +2,8 @@
   "name": "supersave",
   "version": "0.20.0",
   "description": "A package to create a simple datastore with a generic API for side projects.",
-  "main": "build/index.js",
+  "type": "module",
+  "main": "dist/index.js",
   "packageManager": "pnpm@10.10.0",
   "scripts": {
     "watch": "tsc -w",
@@ -18,14 +19,14 @@
     "test:watch": "cross-env DEBUG=supersave:* vitest",
     "test:watch:mysql": "cross-env DEBUG=supersave:* CONN=mysql://supersave:savesuper@127.0.0.1:3306/supersave vitest run --no-file-parallelism",
     "test:ui": "vitest --ui",
-    "clean": "rimraf build",
+    "clean": "rimraf dist",
     "start": "nodemon tests/run.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/supersavehq/supersave.git"
   },
-  "types": "./build/index.d.ts",
+  "types": "./dist/index.d.ts",
   "husky": {
     "hooks": {
       "pre-commit": "npm run lint",
@@ -33,10 +34,10 @@
     }
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "files": [
-    "build"
+    "dist"
   ],
   "keywords": [
     "sqlite",

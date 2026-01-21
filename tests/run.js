@@ -1,5 +1,5 @@
-const express = require('express');
-const { SuperSave } = require('../build');
+import express from 'express';
+import { SuperSave } from '../dist/index.js';
 
 const planetEntity = {
   name: 'planet',
@@ -49,7 +49,7 @@ const main = async () => {
   const app = express();
   const port = process.env.PORT || 4567;
 
-  app.use('/api', await superSave.getRouter());
+  app.use('/api', superSave.getNodeHandler());
 
   app.listen(port, () => {
     // biome-ignore lint/suspicious/noConsole: It's a test file.

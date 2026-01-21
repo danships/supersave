@@ -6,7 +6,7 @@
     "lib": ["ES2022", "DOM"],
     "allowJs": false,
     "declaration": true,
-    "outDir": "./build",
+    "outDir": "./dist",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -24,5 +24,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["tests", "build"]
+  "exclude": ["tests", "dist"]
 }

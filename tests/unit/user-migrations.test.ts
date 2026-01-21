@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-import SuperSave from '../../src/super-save';
-import getConnection from '../connection';
-import { clear } from '../mysql';
+import SuperSave from '../../src/super-save.js';
+import getConnection from '../connection.js';
+import { clear } from '../mysql.js';
 
 beforeEach(clear);
 

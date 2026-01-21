@@ -1,9 +1,9 @@
 import { beforeEach, expect, test } from 'vitest';
-import { type Repository, SuperSave } from '../../build';
-import getConnection from '../connection';
-import { moonEntity, planetEntity } from '../entities';
-import { clear } from '../mysql';
-import type { Moon, Planet } from '../types';
+import { type Repository, SuperSave } from '../../dist/index.js';
+import getConnection from '../connection.js';
+import { moonEntity, planetEntity } from '../entities.js';
+import { clear } from '../mysql.js';
+import type { Moon, Planet } from '../types.js';
 
 beforeEach(clear);
 
