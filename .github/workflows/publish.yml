@@ -1,17 +1,14 @@
 name: Publish Package
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  release:
+    types: [published]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,14 +21,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          npm-version: 'latest'
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'pnpm'
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          cache: "pnpm"
 
-      - name: Get version from tag
+      - name: Get version from release tag
         id: get_version
-        run: echo "VERSION=$(echo ${GITHUB_REF} | sed -e 's,^refs/tags/v,,' -e 's,^refs/tags/,,')" >> $GITHUB_OUTPUT
+        run: echo "VERSION=$(echo ${{ github.event.release.tag_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
 
       - name: Update package.json version
         run: npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
@@ -50,9 +46,25 @@ jobs:
         run: |
           if [[ "${{ steps.get_version.outputs.VERSION }}" =~ - ]]; then
             echo "TAG=beta" >> $GITHUB_OUTPUT
+            echo "IS_BETA=true" >> $GITHUB_OUTPUT
           else
             echo "TAG=latest" >> $GITHUB_OUTPUT
+            echo "IS_BETA=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish to npm
         run: npm publish --tag ${{ steps.npm_tag.outputs.TAG }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Update package.json version on main
+        if: steps.npm_tag.outputs.IS_BETA == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          npm version --no-git-tag-version --allow-same-version ${{ steps.get_version.outputs.VERSION }}
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.get_version.outputs.VERSION }}"
+          git push origin main
