@@ -1,7 +1,9 @@
 import type { Database } from 'better-sqlite3';
 import type { Debugger } from 'debug';
 import Debug from 'debug';
-import { generate } from 'short-uuid';
+import shortUuid from 'short-uuid';
+
+const { generate } = shortUuid;
 import type {
   BaseEntity,
   EntityDefinition,

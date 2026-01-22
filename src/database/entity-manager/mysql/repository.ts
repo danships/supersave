@@ -1,7 +1,9 @@
 import type { Debugger } from 'debug';
 import Debug from 'debug';
 import type { Pool } from 'mysql2/promise';
-import { generate } from 'short-uuid';
+import shortUuid from 'short-uuid';
+
+const { generate } = shortUuid;
 import type {
   BaseEntity,
   EntityDefinition,
