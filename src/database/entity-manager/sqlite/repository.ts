@@ -4,6 +4,7 @@ import Debug from 'debug';
 import shortUuid from 'short-uuid';
 
 const { generate } = shortUuid;
+
 import type {
   BaseEntity,
   EntityDefinition,

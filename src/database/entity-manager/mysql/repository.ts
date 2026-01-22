@@ -4,6 +4,7 @@ import type { Pool } from 'mysql2/promise';
 import shortUuid from 'short-uuid';
 
 const { generate } = shortUuid;
+
 import type {
   BaseEntity,
   EntityDefinition,
