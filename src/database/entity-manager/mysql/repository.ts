@@ -9,10 +9,12 @@ import type {
   BaseEntity,
   EntityDefinition,
   EntityRow,
+  LogicalGroup,
+  QueryCondition,
   QueryFilter,
   QuerySort,
 } from '../../types.js';
-import { QueryOperatorEnum } from '../../types.js';
+import { LogicalOperatorEnum, QueryOperatorEnum } from '../../types.js';
 import type Query from '../query.js';
 import BaseRepository from '../repository.js';
 import { executeQuery, getQuery } from './utils.js';
@@ -75,54 +77,78 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     return [];
   }
 
+  private buildWhereClause(
+    condition: QueryCondition,
+    values: (string | number | boolean)[]
+  ): string {
+    if ('logicalOperator' in condition) {
+      const group = condition as LogicalGroup;
+      const clauses = group.conditions
+        .map((c) => this.buildWhereClause(c, values))
+        .filter(Boolean);
+
+      if (clauses.length === 0) return '';
+      if (clauses.length === 1) {
+        return group.logicalOperator === LogicalOperatorEnum.NOT
+          ? `NOT (${clauses[0]})`
+          : `(${clauses[0]})`;
+      }
+
+      const joined = clauses.join(` ${group.logicalOperator} `);
+      return group.logicalOperator === LogicalOperatorEnum.NOT
+        ? `NOT (${joined})`
+        : `(${joined})`;
+    }
+
+    const filter = condition as QueryFilter;
+    if (filter.operator === QueryOperatorEnum.IN) {
+      const placeholders = filter.value.map(() => '?').join(',');
+      values.push(...filter.value);
+      return `${this.pool.escapeId(filter.field)} IN(${placeholders})`;
+    }
+
+    if (
+      filter.operator === QueryOperatorEnum.EQUALS &&
+      (filter.value === null || filter.value === undefined)
+    ) {
+      return `${this.pool.escapeId(filter.field)} IS NULL`;
+    }
+
+    values.push(this.getValueForFilter(filter));
+    return `${this.pool.escapeId(filter.field)} ${filter.operator} ?`;
+  }
+
+  private getValueForFilter(filter: QueryFilter): string | number | boolean {
+    if (
+      this.definition.filterSortFields &&
+      this.definition.filterSortFields[filter.field] === 'boolean'
+    ) {
+      return ['1', 1, 'true', true].includes(filter.value) ? 1 : 0;
+    }
+
+    if (filter.operator === QueryOperatorEnum.LIKE) {
+      return `${filter.value}`.replace(/\*/g, '%');
+    }
+
+    return filter.value;
+  }
+
   public async getByQuery(query: Query): Promise<T[]> {
     const values: (string | number | boolean)[] = [];
-    const where: string[] = [];
 
-    query.getWhere().forEach((queryFilter: QueryFilter) => {
-      if (queryFilter.operator === QueryOperatorEnum.IN) {
-        const placeholders: string[] = [];
-        queryFilter.value.forEach((value: string) => {
-          const placeholder = '?';
-          placeholders.push(placeholder);
-          values.push(value);
-        });
-
-        where.push(
-          `${this.pool.escapeId(queryFilter.field)} IN(${placeholders.join(
-            ','
-          )})`
-        );
-      } else if (
-        queryFilter.operator === QueryOperatorEnum.EQUALS &&
-        (queryFilter.value === null || queryFilter.value === undefined)
-      ) {
-        // Handle null comparison - use IS NULL instead of = NULL
-        where.push(`${this.pool.escapeId(queryFilter.field)} IS NULL`);
-      } else {
-        where.push(
-          `${this.pool.escapeId(queryFilter.field)} ${queryFilter.operator} ?`
-        );
-        if (
-          this.definition.filterSortFields &&
-          this.definition.filterSortFields[queryFilter.field] === 'boolean'
-        ) {
-          values.push(
-            ['1', 1, 'true', true].includes(queryFilter.value) ? 1 : 0
-          );
-        } else if (queryFilter.operator === QueryOperatorEnum.LIKE) {
-          values.push(`${queryFilter.value}`.replace(/\*/g, '%'));
-        } else {
-          values.push(queryFilter.value);
-        }
-      }
-    });
+    const conditions = query.getWhere();
+    const whereClauses = conditions
+      .map((condition) => this.buildWhereClause(condition, values))
+      .filter(Boolean);
 
     let sqlQuery = `SELECT id,contents FROM ${this.pool.escapeId(
       this.tableName
-    )}
-      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
-    `;
+    )}`;
+
+    if (whereClauses.length > 0) {
+      sqlQuery += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+
     if (query.getSort().length > 0) {
       sqlQuery = `${sqlQuery} ORDER BY ${query
         .getSort()

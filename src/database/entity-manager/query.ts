@@ -1,13 +1,19 @@
 import type {
   FilterSortField,
+  QueryCondition,
   QueryFilter,
   QueryFilterValue,
   QuerySort,
 } from '../types.js';
-import { QueryOperatorEnum } from '../types.js';
+import { LogicalOperatorEnum, QueryOperatorEnum } from '../types.js';
 
 class Query {
-  private where: QueryFilter[] = [];
+  private where: QueryCondition[] = [];
+
+  private currentGroup?: {
+    logicalOperator: LogicalOperatorEnum;
+    conditions: QueryCondition[];
+  };
 
   private sortValues: QuerySort[] = [];
 
@@ -27,7 +33,16 @@ class Query {
     if (typeof this.filterSortFields[field] === 'undefined') {
       throw new TypeError(`Cannot filter on not defined field ${field}.`);
     }
-    this.where.push({ operator, field, value });
+    const filter: QueryFilter = { operator, field, value };
+
+    if (this.currentGroup) {
+      this.currentGroup.conditions.push(filter);
+      if (this.currentGroup.logicalOperator === LogicalOperatorEnum.NOT) {
+        this.finalizeGroup();
+      }
+    } else {
+      this.where.push(filter);
+    }
     return this;
   }
 
@@ -59,7 +74,61 @@ class Query {
     return this.addFilter(QueryOperatorEnum.IN, field, value);
   }
 
-  public getWhere(): QueryFilter[] {
+  private finalizeGroup(): void {
+    if (this.currentGroup) {
+      this.where.push({
+        logicalOperator: this.currentGroup.logicalOperator,
+        conditions: this.currentGroup.conditions,
+      });
+      this.currentGroup = undefined;
+    }
+  }
+
+  public and(...queries: Query[]): Query {
+    this.finalizeGroup();
+    if (queries.length > 0) {
+      const conditions = queries.flatMap((q) => q.getWhere());
+      this.where.push({
+        logicalOperator: LogicalOperatorEnum.AND,
+        conditions,
+      });
+    } else {
+      this.currentGroup = {
+        logicalOperator: LogicalOperatorEnum.AND,
+        conditions: [],
+      };
+    }
+    return this;
+  }
+
+  public or(...queries: Query[]): Query {
+    this.finalizeGroup();
+    if (queries.length > 0) {
+      const conditions = queries.flatMap((q) => q.getWhere());
+      this.where.push({
+        logicalOperator: LogicalOperatorEnum.OR,
+        conditions,
+      });
+    } else {
+      this.currentGroup = {
+        logicalOperator: LogicalOperatorEnum.OR,
+        conditions: [],
+      };
+    }
+    return this;
+  }
+
+  public not(): Query {
+    this.finalizeGroup();
+    this.currentGroup = {
+      logicalOperator: LogicalOperatorEnum.NOT,
+      conditions: [],
+    };
+    return this;
+  }
+
+  public getWhere(): QueryCondition[] {
+    this.finalizeGroup();
     return this.where;
   }
 
