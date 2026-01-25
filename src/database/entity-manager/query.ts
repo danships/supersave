@@ -87,11 +87,27 @@ class Query {
   public and(...queries: Query[]): Query {
     this.finalizeGroup();
     if (queries.length > 0) {
-      const conditions = queries.flatMap((q) => q.getWhere());
-      this.where.push({
-        logicalOperator: LogicalOperatorEnum.AND,
-        conditions,
+      const conditions: QueryCondition[] = [];
+      queries.forEach((q) => {
+        const subqueryWhere = q.getWhere();
+        if (subqueryWhere.length === 0) {
+          return;
+        }
+        if (subqueryWhere.length === 1) {
+          conditions.push(subqueryWhere[0]);
+        } else {
+          conditions.push({
+            logicalOperator: LogicalOperatorEnum.AND,
+            conditions: subqueryWhere,
+          });
+        }
       });
+      if (conditions.length > 0) {
+        this.where.push({
+          logicalOperator: LogicalOperatorEnum.AND,
+          conditions,
+        });
+      }
     } else {
       this.currentGroup = {
         logicalOperator: LogicalOperatorEnum.AND,
@@ -104,11 +120,27 @@ class Query {
   public or(...queries: Query[]): Query {
     this.finalizeGroup();
     if (queries.length > 0) {
-      const conditions = queries.flatMap((q) => q.getWhere());
-      this.where.push({
-        logicalOperator: LogicalOperatorEnum.OR,
-        conditions,
+      const conditions: QueryCondition[] = [];
+      queries.forEach((q) => {
+        const subqueryWhere = q.getWhere();
+        if (subqueryWhere.length === 0) {
+          return;
+        }
+        if (subqueryWhere.length === 1) {
+          conditions.push(subqueryWhere[0]);
+        } else {
+          conditions.push({
+            logicalOperator: LogicalOperatorEnum.AND,
+            conditions: subqueryWhere,
+          });
+        }
       });
+      if (conditions.length > 0) {
+        this.where.push({
+          logicalOperator: LogicalOperatorEnum.OR,
+          conditions,
+        });
+      }
     } else {
       this.currentGroup = {
         logicalOperator: LogicalOperatorEnum.OR,

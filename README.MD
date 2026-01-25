@@ -83,16 +83,14 @@ SuperSave provides a fluent API for building complex queries with AND, OR, and N
 
 To query entities programmatically (not via HTTP API), use the `createQuery()` method on a repository:
 
-```typescript
-const planetRepository = await superSave.addEntity(planetEntity);
-const query = planetRepository.createQuery();
+    const planetRepository = await superSave.addEntity(planetEntity);
+    const query = planetRepository.createQuery();
 
-// Simple equality filter
-query.eq('name', 'Earth');
+    // Simple equality filter
+    query.eq('name', 'Earth');
 
-// Get results
-const planets = await planetRepository.getByQuery(query);
-```
+    // Get results
+    const planets = await planetRepository.getByQuery(query);
 
 ### Available Filter Methods
 
@@ -113,94 +111,78 @@ const planets = await planetRepository.getByQuery(query);
 
 When chaining filter methods without specifying a logical operator, they are automatically combined with AND:
 
-```typescript
-const query = planetRepository.createQuery();
-query.eq('name', 'Earth').eq('distance', 100);
-// Generates: WHERE name = 'Earth' AND distance = 100
-```
+    const query = planetRepository.createQuery();
+    query.eq('name', 'Earth').eq('distance', 100);
+    // Generates: WHERE name = 'Earth' AND distance = 100
 
 ### Explicit AND
 
 Use `and()` to explicitly create an AND group:
 
-```typescript
-const query = planetRepository.createQuery();
-query.and().eq('name', 'Earth').eq('distance', 100);
-// Generates: WHERE (name = 'Earth' AND distance = 100)
-```
+    const query = planetRepository.createQuery();
+    query.and().eq('name', 'Earth').eq('distance', 100);
+    // Generates: WHERE (name = 'Earth' AND distance = 100)
 
 ### OR
 
 Use `or()` to create an OR group:
 
-```typescript
-const query = planetRepository.createQuery();
-query.or().eq('name', 'Earth').eq('name', 'Mars');
-// Generates: WHERE (name = 'Earth' OR name = 'Mars')
-```
+    const query = planetRepository.createQuery();
+    query.or().eq('name', 'Earth').eq('name', 'Mars');
+    // Generates: WHERE (name = 'Earth' OR name = 'Mars')
 
 ### NOT
 
 Use `not()` to negate a filter:
 
-```typescript
-const query = planetRepository.createQuery();
-query.not().eq('name', 'Pluto');
-// Generates: WHERE NOT (name = 'Pluto')
-```
+    const query = planetRepository.createQuery();
+    query.not().eq('name', 'Pluto');
+    // Generates: WHERE NOT (name = 'Pluto')
 
 ### Nested Groups
 
 Pass sub-queries to `or()` or `and()` to create nested conditions:
 
-```typescript
-const query = planetRepository.createQuery();
+    const query = planetRepository.createQuery();
 
-// OR of two AND groups
-query.or(
-  planetRepository.createQuery().and().eq('name', 'Earth').eq('distance', 100),
-  planetRepository.createQuery().and().eq('name', 'Venus').eq('distance', 200)
-);
-// Generates: WHERE ((name = 'Earth' AND distance = 100) OR (name = 'Venus' AND distance = 200))
-```
+    // OR of two AND groups
+    query.or(
+      planetRepository.createQuery().and().eq('name', 'Earth').eq('distance', 100),
+      planetRepository.createQuery().and().eq('name', 'Venus').eq('distance', 200)
+    );
+    // Generates: WHERE ((name = 'Earth' AND distance = 100) OR (name = 'Venus' AND distance = 200))
 
 ### Complex Queries
 
 Combine multiple logical operators for complex conditions:
 
-```typescript
-const query = planetRepository.createQuery();
+    const query = planetRepository.createQuery();
 
-// Find visible planets that are either Earth or Mars
-query.and().eq('visible', true).or(
-  planetRepository.createQuery().eq('name', 'Earth'),
-  planetRepository.createQuery().eq('name', 'Mars')
-);
+    // Find visible planets that are either Earth or Mars
+    query.and().eq('visible', true).or(
+      planetRepository.createQuery().eq('name', 'Earth'),
+      planetRepository.createQuery().eq('name', 'Mars')
+    );
 
-const planets = await planetRepository.getByQuery(query);
-```
+    const planets = await planetRepository.getByQuery(query);
 
 ### Sorting and Limiting
 
-```typescript
-const query = planetRepository.createQuery();
-query
-  .or().eq('name', 'Earth').eq('name', 'Mars')
-  .sort('name', 'desc')  // Sort by name descending
-  .limit(10)             // Maximum 10 results
-  .offset(5);            // Skip first 5 results
+    const query = planetRepository.createQuery();
+    query
+      .or().eq('name', 'Earth').eq('name', 'Mars')
+      .sort('name', 'desc')  // Sort by name descending
+      .limit(10)             // Maximum 10 results
+      .offset(5);            // Skip first 5 results
 
-const planets = await planetRepository.getByQuery(query);
-```
+    const planets = await planetRepository.getByQuery(query);
 
 ### Getting a Single Result
 
-```typescript
-const query = planetRepository.createQuery();
-query.eq('name', 'Earth');
+    const query = planetRepository.createQuery();
+    query.eq('name', 'Earth');
 
-const planet = await planetRepository.getOneByQuery(query);
-```
+    const planet = await planetRepository.getOneByQuery(query);
 
 **Note:** To use filters, the field must be defined in `filterSortFields` when creating the entity or collection.
 

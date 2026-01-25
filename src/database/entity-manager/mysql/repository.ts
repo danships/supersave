@@ -102,6 +102,9 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
 
     const filter = condition as QueryFilter;
     if (filter.operator === QueryOperatorEnum.IN) {
+      if (Array.isArray(filter.value) && filter.value.length === 0) {
+        return '1 = 0';
+      }
       const placeholders = filter.value.map(() => '?').join(',');
       values.push(...filter.value);
       return `${this.pool.escapeId(filter.field)} IN(${placeholders})`;
