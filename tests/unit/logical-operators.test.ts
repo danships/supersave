@@ -246,4 +246,28 @@ describe('logical operators: AND, OR, NOT', () => {
 
     await superSave.close();
   });
+
+  test('IN with empty array returns no results', async () => {
+    const filteredPlanetEntity: EntityDefinition = {
+      ...planetEntity,
+      filterSortFields: {
+        name: 'string',
+      },
+    };
+
+    const superSave: SuperSave = await SuperSave.create(getConnection());
+    const planetRepository =
+      await superSave.addEntity<Planet>(filteredPlanetEntity);
+
+    await planetRepository.create({ name: 'Earth' });
+    await planetRepository.create({ name: 'Mars' });
+
+    const query = planetRepository.createQuery();
+    query.in('name', []);
+
+    const results = await planetRepository.getByQuery(query);
+    expect(results).toHaveLength(0);
+
+    await superSave.close();
+  });
 });
