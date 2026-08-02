@@ -37,6 +37,19 @@ export enum QueryOperatorEnum {
   LIKE = 'LIKE',
 }
 
+export enum LogicalOperatorEnum {
+  AND = 'AND',
+  OR = 'OR',
+  NOT = 'NOT',
+}
+
+export interface LogicalGroup {
+  logicalOperator: LogicalOperatorEnum;
+  conditions: QueryCondition[];
+}
+
+export type QueryCondition = QueryFilter | LogicalGroup;
+
 export type QueryFilter = {
   operator: QueryOperatorEnum;
   field: string;
