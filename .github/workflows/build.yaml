@@ -140,7 +140,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Select peer version
-        run: pnpm add --no-save --lockfile=false ${{ matrix.driver }}@${{ matrix.version }}
+        run: pnpm add --lockfile=false ${{ matrix.driver }}@${{ matrix.version }}
 
       - name: Build package
         run: pnpm build
