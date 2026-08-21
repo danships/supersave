@@ -517,6 +517,10 @@ const rows = db.prepare('SELECT * FROM my_table WHERE id = ?').all(id);
 
 # Development
 
+Installing this repository's development dependencies requires Node.js 22.13+
+and pnpm 11.22.0 or later. The published package continues to support Node.js
+20+; consumers on Node.js 20 can use compatible better-sqlite3 11 or 12 peers.
+
 This module currently supports both sqlite and mysql. Development for sqlite is pretty straight-forward,
 you can use `:memory:` as the filename to set up a memory-only database.
 

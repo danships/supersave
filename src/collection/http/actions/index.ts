@@ -5,4 +5,4 @@ import getById from './get-by-id.js';
 import overview from './overview.js';
 import updateById from './update-by-id.js';
 
-export { overview, get, create, updateById, getById, deleteById };
+export { create, deleteById, get, getById, overview, updateById };

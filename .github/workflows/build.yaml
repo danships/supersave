@@ -17,12 +17,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.13.0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.10.0
+          version: 11.22.0
 
       - name: Get pnpm store directory
         shell: bash
@@ -41,7 +41,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Security Audit
-        run: pnpm audit --prod --audit-level=moderate
+        run: pnpm audit
 
       - name: Cache build output
         uses: actions/cache@v4
@@ -99,3 +99,73 @@ jobs:
       - name: Stop MySQL container
         if: always()
         run: docker stop mysql-test
+
+  peer-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: better-sqlite3
+            version: 11.1.2
+            suite: test
+          - driver: better-sqlite3
+            version: 12.0.0
+            suite: test
+          - driver: better-sqlite3
+            version: 13.0.3
+            suite: test
+          - driver: mysql2
+            version: 3.11.0
+            suite: test:mysql
+          - driver: mysql2
+            version: 3.23.4
+            suite: test:mariadb
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Select peer version
+        run: pnpm add --no-save --lockfile=false ${{ matrix.driver }}@${{ matrix.version }}
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Start database
+        if: matrix.driver == 'mysql2'
+        run: |
+          if [ "${{ matrix.suite }}" = "test:mysql" ]; then
+            IMAGE=mysql:8.4
+            PORT=3306
+          else
+            IMAGE=mariadb:11.7.2
+            PORT=3307
+          fi
+          docker run -d --rm --name peer-database \
+            -e MYSQL_ROOT_PASSWORD=testpassword \
+            -e MYSQL_DATABASE=supersave \
+            -e MYSQL_USER=supersave \
+            -e MYSQL_PASSWORD=savesuper \
+            -p "$PORT:3306" "$IMAGE"
+          until docker exec peer-database mysqladmin ping -h localhost -u root -ptestpassword --silent; do sleep 1; done
+
+      - name: Run peer suite
+        run: pnpm ${{ matrix.suite }}
+
+      - name: Stop database
+        if: always() && matrix.driver == 'mysql2'
+        run: docker stop peer-database
