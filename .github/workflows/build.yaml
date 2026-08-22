@@ -158,6 +158,21 @@ jobs:
             -e MYSQL_USER=supersave \
             -e MYSQL_PASSWORD=savesuper \
             -p "$PORT:3306" "$IMAGE"
+
+          # The official mysql/mariadb images start a temporary server to run
+          # init scripts, then shut it down before starting the real server.
+          # A plain "mysqladmin ping" can succeed against that temporary
+          # server, causing the connection to be dropped once it restarts.
+          # Wait for "ready for connections" to appear twice in the logs
+          # (once for the temporary server, once for the final one) before
+          # relying on the connection.
+          for i in $(seq 1 60); do
+            READY_COUNT=$(docker logs peer-database 2>&1 | grep -c "ready for connections" || true)
+            if [ "$READY_COUNT" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
           until docker exec peer-database mysqladmin ping -h localhost -u root -ptestpassword --silent; do sleep 1; done
 
       - name: Run peer suite
