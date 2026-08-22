@@ -12,7 +12,7 @@
     "lint:tsc": "tsc --noEmit",
     "lint:biome": "biome ci",
     "format": "biome check --write",
-    "test": "vitest run --no-file-parallelism",
+    "test": "vitest run",
     "test:all": "pnpm test && pnpm test:mysql && pnpm test:mariadb",
     "test:mysql": "cross-env CONN=mysql://supersave:savesuper@127.0.0.1:3306/supersave vitest run --no-file-parallelism",
     "test:mariadb": "cross-env CONN=mysql://supersave:savesuper@127.0.0.1:3307/supersave vitest run --no-file-parallelism",
@@ -59,7 +59,7 @@
     "@types/pluralize": "0.0.33",
     "@types/slug": "5.0.9",
     "@types/supertest": "7.2.1",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^12.11.1",
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
     "express": "^5.2.1",
@@ -72,7 +72,7 @@
     "vitest": "^4.1.11"
   },
   "peerDependencies": {
-    "better-sqlite3": "^11.1.2 || ^12.0.0 || ^13.0.0",
+    "better-sqlite3": "^11.1.2 || ^12.0.0",
     "mysql2": "^3.11.0"
   },
   "peerDependenciesMeta": {
