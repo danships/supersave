@@ -71,8 +71,21 @@ jobs:
             -p 3307:3306 \
             mariadb:11.7.2
 
-          # Wait for Mariadb to be ready
-          docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --wait=30
+          # The official mariadb image starts a temporary server to run
+          # init scripts, then shuts it down before starting the real server.
+          # A plain "mariadb-admin ping" can succeed against that temporary
+          # server, causing the connection to be dropped once it restarts.
+          # Wait for "ready for connections" to appear twice in the logs
+          # (once for the temporary server, once for the final one) before
+          # relying on the connection.
+          for i in $(seq 1 60); do
+            READY_COUNT=$(docker logs mariadb-test 2>&1 | grep -c "ready for connections" || true)
+            if [ "$READY_COUNT" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+          until docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --silent; do sleep 1; done
 
           pnpm test:mariadb
 
@@ -91,8 +104,21 @@ jobs:
             -p 3306:3306 \
             mysql:8.4
 
-          # Wait for MySQL to be ready
-          docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --wait=30
+          # The official mysql image starts a temporary server to run init
+          # scripts, then shuts it down before starting the real server. A
+          # plain "mysqladmin ping" can succeed against that temporary
+          # server, causing the connection to be dropped once it restarts.
+          # Wait for "ready for connections" to appear twice in the logs
+          # (once for the temporary server, once for the final one) before
+          # relying on the connection.
+          for i in $(seq 1 60); do
+            READY_COUNT=$(docker logs mysql-test 2>&1 | grep -c "ready for connections" || true)
+            if [ "$READY_COUNT" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+          until docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --silent; do sleep 1; done
 
           pnpm test:mysql
 
