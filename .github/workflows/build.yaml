@@ -204,9 +204,11 @@ jobs:
           if [ "${{ matrix.suite }}" = "test:mysql" ]; then
             IMAGE=mysql:8.4
             PORT=3306
+            PING_CMD=mysqladmin
           else
             IMAGE=mariadb:11.7.2
             PORT=3307
+            PING_CMD=mariadb-admin
           fi
           docker run -d --rm --name peer-database \
             -e MYSQL_ROOT_PASSWORD=testpassword \
@@ -234,7 +236,7 @@ jobs:
           # fails fast instead of hanging until the job-level timeout.
           PING_OK=false
           for _ in $(seq 1 60); do
-            if docker exec peer-database mysqladmin ping -h localhost -u root -ptestpassword --silent; then
+            if docker exec peer-database "$PING_CMD" ping -h localhost -u root -ptestpassword --silent; then
               PING_OK=true
               break
             fi
