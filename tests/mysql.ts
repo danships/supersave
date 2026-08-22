@@ -14,8 +14,8 @@ const RETRYABLE_CONNECTION_ERROR_CODES = new Set([
 
 async function createConnectionWithRetry(
   connectionString: string,
-  maxAttempts = 10,
-  delayMs = 500
+  maxAttempts: number = 10,
+  delayMs: number = 500
 ): Promise<Connection> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {

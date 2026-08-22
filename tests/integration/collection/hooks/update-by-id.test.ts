@@ -19,133 +19,142 @@ describe('updateBefore hook', () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
-    await superSave.addCollection<Planet>({
-      ...planetCollection,
-      hooks: [
-        {
-          updateBefore: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            entity: any
-          ): any => {
-            return {
-              ...entity,
-              name: `HOOK-${entity.name ?? ''}`,
-            };
+    try {
+      await superSave.addCollection<Planet>({
+        ...planetCollection,
+        hooks: [
+          {
+            updateBefore: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              entity: any
+            ): any => {
+              return {
+                ...entity,
+                name: `HOOK-${entity.name ?? ''}`,
+              };
+            },
+            entityTransform: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              entity: any
+            ): any => {
+              return {
+                ...entity,
+                name: `${entity.name}-TRANSFORM`,
+              };
+            },
           },
-          entityTransform: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            entity: any
-          ): any => {
-            return {
-              ...entity,
-              name: `${entity.name}-TRANSFORM`,
-            };
-          },
-        },
-      ],
-    });
-    app.use('/', superSave.getNodeHandler());
+        ],
+      });
+      app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
+      const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
-    // create the planet
-    const createResponse = await supertest(app)
-      .post('/planets')
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(200);
-    expect(createResponse.body.data.name).toBe(`${planet.name}-TRANSFORM`);
+      // create the planet
+      const createResponse = await supertest(app)
+        .post('/planets')
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(200);
+      expect(createResponse.body.data.name).toBe(`${planet.name}-TRANSFORM`);
 
-    // update it
-    const updateResponse = await supertest(app)
-      .patch(`/planets/${createResponse.body.data.id}`)
-      .send({ name: planet.name })
-      .expect('Content-Type', /json/)
-      .expect(200);
+      // update it
+      const updateResponse = await supertest(app)
+        .patch(`/planets/${createResponse.body.data.id}`)
+        .send({ name: planet.name })
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-    expect(updateResponse.body.data?.name).toBe(
-      `HOOK-${planet.name}-TRANSFORM`
-    );
-    await superSave.close();
+      expect(updateResponse.body.data?.name).toBe(
+        `HOOK-${planet.name}-TRANSFORM`
+      );
+    } finally {
+      await superSave.close();
+    }
   });
 
   test('the statusCode and message are copied from the exception', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
-    await superSave.addCollection<Planet>({
-      ...planetCollection,
-      hooks: [
-        {
-          updateBefore: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            _entity: any
-          ) => {
-            throw new HookError('Test message', 401);
+    try {
+      await superSave.addCollection<Planet>({
+        ...planetCollection,
+        hooks: [
+          {
+            updateBefore: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              _entity: any
+            ) => {
+              throw new HookError('Test message', 401);
+            },
           },
-        },
-      ],
-    });
-    app.use('/', superSave.getNodeHandler());
+        ],
+      });
+      app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
+      const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
-    // create
-    const createResponse = await supertest(app)
-      .post('/planets')
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(200);
+      // create
+      const createResponse = await supertest(app)
+        .post('/planets')
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-    // update
-    const response = await supertest(app)
-      .patch(`/planets/${createResponse.body.data.id}`)
-      .send({ name: 'Updated planet' })
-      .expect('Content-Type', /json/)
-      .expect(401);
+      // update
+      const response = await supertest(app)
+        .patch(`/planets/${createResponse.body.data.id}`)
+        .send({ name: 'Updated planet' })
+        .expect('Content-Type', /json/)
+        .expect(401);
 
-    expect(response.body.message).toBe('Test message');
-    await superSave.close();
+      expect(response.body.message).toBe('Test message');
+    } finally {
+      await superSave.close();
+    }
   });
 
   test('the message is copied from the exception', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
-    await superSave.addCollection<Planet>({
-      ...planetCollection,
-      hooks: [
-        {
-          updateBefore: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            _entity: any
-          ) => {
-            throw new HookError('Test message');
+    try {
+      await superSave.addCollection<Planet>({
+        ...planetCollection,
+        hooks: [
+          {
+            updateBefore: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              _entity: any
+            ) => {
+              throw new HookError('Test message');
+            },
           },
-        },
-      ],
-    });
-    app.use('/', superSave.getNodeHandler());
+        ],
+      });
+      app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
+      const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
-    const createResponse = await supertest(app)
-      .post('/planets')
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(200);
+      const createResponse = await supertest(app)
+        .post('/planets')
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-    const updateResponse = await supertest(app)
-      .patch(`/planets/${createResponse.body.data.id}`)
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(500);
+      const updateResponse = await supertest(app)
+        .patch(`/planets/${createResponse.body.data.id}`)
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(500);
 
-    expect(updateResponse.body.message).toBe('Test message');
-    await superSave.close();
+      expect(updateResponse.body.message).toBe('Test message');
+    } finally {
+      await superSave.close();
+    }
   });
 });

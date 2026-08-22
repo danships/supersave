@@ -78,14 +78,29 @@ jobs:
           # Wait for "ready for connections" to appear twice in the logs
           # (once for the temporary server, once for the final one) before
           # relying on the connection.
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             READY_COUNT=$(docker logs mariadb-test 2>&1 | grep -c "ready for connections" || true)
             if [ "$READY_COUNT" -ge 2 ]; then
               break
             fi
             sleep 1
           done
-          until docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --silent; do sleep 1; done
+
+          # Bound the ping loop so a container that never becomes reachable
+          # fails fast instead of hanging until the job-level timeout.
+          PING_OK=false
+          for _ in $(seq 1 60); do
+            if docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --silent; then
+              PING_OK=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$PING_OK" != "true" ]; then
+            echo "::error::MariaDB did not become ready in time"
+            docker logs mariadb-test
+            exit 1
+          fi
 
           pnpm test:mariadb
 
@@ -111,14 +126,29 @@ jobs:
           # Wait for "ready for connections" to appear twice in the logs
           # (once for the temporary server, once for the final one) before
           # relying on the connection.
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             READY_COUNT=$(docker logs mysql-test 2>&1 | grep -c "ready for connections" || true)
             if [ "$READY_COUNT" -ge 2 ]; then
               break
             fi
             sleep 1
           done
-          until docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --silent; do sleep 1; done
+
+          # Bound the ping loop so a container that never becomes reachable
+          # fails fast instead of hanging until the job-level timeout.
+          PING_OK=false
+          for _ in $(seq 1 60); do
+            if docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --silent; then
+              PING_OK=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$PING_OK" != "true" ]; then
+            echo "::error::MySQL did not become ready in time"
+            docker logs mysql-test
+            exit 1
+          fi
 
           pnpm test:mysql
 
@@ -192,14 +222,29 @@ jobs:
           # Wait for "ready for connections" to appear twice in the logs
           # (once for the temporary server, once for the final one) before
           # relying on the connection.
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             READY_COUNT=$(docker logs peer-database 2>&1 | grep -c "ready for connections" || true)
             if [ "$READY_COUNT" -ge 2 ]; then
               break
             fi
             sleep 1
           done
-          until docker exec peer-database mysqladmin ping -h localhost -u root -ptestpassword --silent; do sleep 1; done
+
+          # Bound the ping loop so a container that never becomes reachable
+          # fails fast instead of hanging until the job-level timeout.
+          PING_OK=false
+          for _ in $(seq 1 60); do
+            if docker exec peer-database mysqladmin ping -h localhost -u root -ptestpassword --silent; then
+              PING_OK=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$PING_OK" != "true" ]; then
+            echo "::error::Peer database did not become ready in time"
+            docker logs peer-database
+            exit 1
+          fi
 
       - name: Run peer suite
         run: pnpm ${{ matrix.suite }}

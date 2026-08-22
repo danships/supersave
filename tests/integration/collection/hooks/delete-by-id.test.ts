@@ -22,31 +22,34 @@ describe('deleteBefore', () => {
       const app: express.Application = express();
       const superSave = await SuperSave.create(getConnection());
 
-      const planetRepository: Repository<Planet> =
-        await superSave.addCollection<Planet>({
-          ...planetCollection,
-          hooks: [
-            {
-              deleteBefore: (
-                _collection: Collection,
-                _ctx: HttpContext,
-                _entity: any
-              ) => {
-                throw new HookError('Test message', statusCode);
+      try {
+        const planetRepository: Repository<Planet> =
+          await superSave.addCollection<Planet>({
+            ...planetCollection,
+            hooks: [
+              {
+                deleteBefore: (
+                  _collection: Collection,
+                  _ctx: HttpContext,
+                  _entity: any
+                ) => {
+                  throw new HookError('Test message', statusCode);
+                },
               },
-            },
-          ],
-        });
-      const planet = await planetRepository.create({ name: 'Earth' });
-      app.use('/', superSave.getNodeHandler());
+            ],
+          });
+        const planet = await planetRepository.create({ name: 'Earth' });
+        app.use('/', superSave.getNodeHandler());
 
-      await supertest(app)
-        .delete(`/planets/${planet.id as string}`)
-        .expect(statusCode ?? 500);
+        await supertest(app)
+          .delete(`/planets/${planet.id as string}`)
+          .expect(statusCode ?? 500);
 
-      const allPlanets = await planetRepository.getAll();
-      expect(allPlanets).toHaveLength(1);
-      await superSave.close();
+        const allPlanets = await planetRepository.getAll();
+        expect(allPlanets).toHaveLength(1);
+      } finally {
+        await superSave.close();
+      }
     }
   );
 });

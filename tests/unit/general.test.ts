@@ -13,43 +13,49 @@ beforeEach(clear);
 
 test('simple entity creation', async () => {
   const superSave = await SuperSave.create(getConnection());
-  const planetRepository: Repository<Planet> =
-    await superSave.addEntity<Planet>(planetEntity);
+  try {
+    const planetRepository: Repository<Planet> =
+      await superSave.addEntity<Planet>(planetEntity);
 
-  const earth: Planet = await planetRepository.create({ name: 'Earth' });
-  const mars: Planet = await planetRepository.create({ name: 'Mars' });
+    const earth: Planet = await planetRepository.create({ name: 'Earth' });
+    const mars: Planet = await planetRepository.create({ name: 'Mars' });
 
-  expect(earth.name).toEqual('Earth');
-  expect(mars.name).toEqual('Mars');
-  await superSave.close();
+    expect(earth.name).toEqual('Earth');
+    expect(mars.name).toEqual('Mars');
+  } finally {
+    await superSave.close();
+  }
 });
 
 test('entity with relations', async () => {
   const superSave = await SuperSave.create(getConnection());
-  const moonRepository: Repository<Moon> =
-    await superSave.addEntity<Moon>(moonEntity);
-  const planetRepository: Repository<Planet> =
-    await superSave.addEntity<Planet>(planetEntity);
+  try {
+    const moonRepository: Repository<Moon> =
+      await superSave.addEntity<Moon>(moonEntity);
+    const planetRepository: Repository<Planet> =
+      await superSave.addEntity<Planet>(planetEntity);
 
-  await planetRepository.create({ name: 'Earth' });
-  await planetRepository.create({ name: 'Mars' });
+    await planetRepository.create({ name: 'Earth' });
+    await planetRepository.create({ name: 'Mars' });
 
-  const planets = await planetRepository.getAll();
-  expect(planets).toHaveLength(2);
+    const planets = await planetRepository.getAll();
+    expect(planets).toHaveLength(2);
 
-  const earth = planets[0].name === 'Earth' ? planets[0] : planets[1]; // Sorting is undetermined
+    const earth = planets[0].name === 'Earth' ? planets[0] : planets[1]; // Sorting is undetermined
 
-  const earthMoon: Moon = await moonRepository.create({
-    name: 'Moon',
-    planet: earth,
-  });
-  expect(earthMoon.id).toBeDefined();
-  expect(earthMoon.name).toEqual('Moon');
-  expect(earthMoon.planet.name).toEqual('Earth');
+    const earthMoon: Moon = await moonRepository.create({
+      name: 'Moon',
+      planet: earth,
+    });
+    expect(earthMoon.id).toBeDefined();
+    expect(earthMoon.name).toEqual('Moon');
+    expect(earthMoon.planet.name).toEqual('Earth');
 
-  const retrievedMoon = await moonRepository.getById(earthMoon.id as string);
-  expect(retrievedMoon).toBeDefined();
-  await superSave.close();
+    const retrievedMoon = await moonRepository.getById(earthMoon.id as string);
+    expect(retrievedMoon).toBeDefined();
+  } finally {
+    await superSave.close();
+  }
 });
 
 test('not existing relation entity throws an error', async () => {
@@ -80,16 +86,19 @@ test('not existing relation entity throws an error', async () => {
 
 test('entity delete', async () => {
   const superSave = await SuperSave.create(getConnection());
-  const planetRepository: Repository<Planet> =
-    await superSave.addEntity<Planet>(planetEntity);
+  try {
+    const planetRepository: Repository<Planet> =
+      await superSave.addEntity<Planet>(planetEntity);
 
-  const earth: Planet = await planetRepository.create({ name: 'Earth' });
-  await planetRepository.create({ name: 'Mars' });
-  // @ts-expect-error
-  await planetRepository.deleteUsingId(earth.id as string);
+    const earth: Planet = await planetRepository.create({ name: 'Earth' });
+    await planetRepository.create({ name: 'Mars' });
+    // @ts-expect-error
+    await planetRepository.deleteUsingId(earth.id as string);
 
-  const remainingEarths = await planetRepository.getAll();
-  expect(remainingEarths).toHaveLength(1);
-  expect(remainingEarths[0].name).toBe('Mars');
-  await superSave.close();
+    const remainingEarths = await planetRepository.getAll();
+    expect(remainingEarths).toHaveLength(1);
+    expect(remainingEarths[0].name).toBe('Mars');
+  } finally {
+    await superSave.close();
+  }
 });
