@@ -21,6 +21,7 @@ test('simple entity creation', async () => {
 
   expect(earth.name).toEqual('Earth');
   expect(mars.name).toEqual('Mars');
+  await superSave.close();
 });
 
 test('entity with relations', async () => {

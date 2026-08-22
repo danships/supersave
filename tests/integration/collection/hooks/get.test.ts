@@ -41,6 +41,7 @@ describe('getHook', () => {
     expect(response.body.data).toBeDefined();
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(0);
+    await superSave.close();
   });
 
   test('transform hook changes entity', async () => {
@@ -74,6 +75,7 @@ describe('getHook', () => {
 
     expect(response.body.data).toBeDefined();
     expect(response.body.data[0].extra).toBe(true);
+    await superSave.close();
   });
 
   test('thrown error with status code is returned', async () => {
@@ -99,5 +101,6 @@ describe('getHook', () => {
       .expect(401);
 
     expect(response.body.message).toBe('Test message');
+    await superSave.close();
   });
 });

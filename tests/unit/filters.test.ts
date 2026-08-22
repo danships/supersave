@@ -214,6 +214,8 @@ describe('general filter tests', () => {
       visible: false,
     });
     await superSave.close();
+    await superSaveReinitialized.close();
+    await superSaveReinitializedAge.close();
   });
 });
 

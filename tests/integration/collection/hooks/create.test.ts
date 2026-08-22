@@ -60,6 +60,7 @@ describe('createBefore hook', () => {
     expect(typeof response.body.data).toBe('object');
     expect(response.body.data.name).toBe(`HOOK-${planet.name}`);
     expect(response.body.data.extra).toEqual(true);
+    await superSave.close();
   });
 
   test('the statusCode and message are copied from the exception', async () => {
@@ -91,6 +92,7 @@ describe('createBefore hook', () => {
       .expect(401);
 
     expect(response.body.message).toBe('Test message');
+    await superSave.close();
   });
 
   test('the message is copied from the exception', async () => {
@@ -122,5 +124,6 @@ describe('createBefore hook', () => {
       .expect(500);
 
     expect(response.body.message).toBe('Test message');
+    await superSave.close();
   });
 });

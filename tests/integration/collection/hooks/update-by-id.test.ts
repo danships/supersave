@@ -68,6 +68,7 @@ describe('updateBefore hook', () => {
     expect(updateResponse.body.data?.name).toBe(
       `HOOK-${planet.name}-TRANSFORM`
     );
+    await superSave.close();
   });
 
   test('the statusCode and message are copied from the exception', async () => {
@@ -107,6 +108,7 @@ describe('updateBefore hook', () => {
       .expect(401);
 
     expect(response.body.message).toBe('Test message');
+    await superSave.close();
   });
 
   test('the message is copied from the exception', async () => {
@@ -144,5 +146,6 @@ describe('updateBefore hook', () => {
       .expect(500);
 
     expect(updateResponse.body.message).toBe('Test message');
+    await superSave.close();
   });
 });

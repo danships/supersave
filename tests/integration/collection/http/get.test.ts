@@ -27,6 +27,7 @@ describe('Express adapter', () => {
     expect(response.body.data).toBeDefined();
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(0);
+    await superSave.close();
   });
 
   test('collection items are returned', async () => {
@@ -47,6 +48,7 @@ describe('Express adapter', () => {
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(1);
     expect(response.body.data[0].name).toBe('Earth');
+    await superSave.close();
   });
 
   test('collection items are sorted when requested: ascending', async () => {
@@ -73,6 +75,7 @@ describe('Express adapter', () => {
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(2);
     expect(response.body.data[0].name).toBe('Earth');
+    await superSave.close();
   });
 
   test('collection items are sorted when requested: descending', async () => {
@@ -99,6 +102,7 @@ describe('Express adapter', () => {
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(2);
     expect(response.body.data[0].name).toBe('Mars');
+    await superSave.close();
   });
 
   test('collection items are sorted case-insensitive', async () => {
@@ -135,6 +139,7 @@ describe('Express adapter', () => {
         expect.objectContaining({ name: 'Z Planet' }),
       ])
     );
+    await superSave.close();
   });
 
   test('undefined sort fields are not accepted.', async () => {
@@ -152,6 +157,7 @@ describe('Express adapter', () => {
       .query({ sort: 'foobar' })
       .expect(400)
       .expect('Content-Type', /json/);
+    await superSave.close();
   });
 
   test('offset is honored', async () => {
