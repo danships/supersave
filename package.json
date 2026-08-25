@@ -4,7 +4,7 @@
   "description": "A package to create a simple datastore with a generic API for side projects.",
   "type": "module",
   "main": "dist/index.js",
-  "packageManager": "pnpm@10.10.0",
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "watch": "tsc -w",
     "build": "tsc",
@@ -20,21 +20,17 @@
     "test:watch:mysql": "cross-env DEBUG=supersave:* CONN=mysql://supersave:savesuper@127.0.0.1:3306/supersave vitest run --no-file-parallelism",
     "test:ui": "vitest --ui",
     "clean": "rimraf dist",
-    "start": "nodemon tests/run.js"
+    "start": "nodemon tests/run.js",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/supersavehq/supersave.git"
   },
   "types": "./dist/index.d.ts",
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run lint",
-      "pre-push": "npm test"
-    }
-  },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=11.22.0"
   },
   "files": [
     "dist"
@@ -56,26 +52,24 @@
   },
   "homepage": "https://github.com/danships/supersave#readme",
   "devDependencies": {
-    "@biomejs/biome": "2.1.1",
-    "@tsconfig/node14": "^1.0.3",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/debug": "^4.1.12",
-    "@types/node": "^22.0.0",
-    "@types/pluralize": "0.0.29",
-    "@types/slug": "^0.9.1",
-    "@types/supertest": "^2.0.16",
-    "better-sqlite3": "^12.2.0",
-    "concurrently": "^8.2.2",
-    "cross-env": "^7.0.3",
-    "express": "^4.21.2",
-    "husky": "^4.3.8",
-    "mysql2": "^3.14.2",
-    "nodemon": "^3.1.10",
-    "rimraf": "^6.0.1",
-    "superagent": "^10.2.2",
-    "supertest": "^7.1.3",
-    "typescript": "^5.8.3",
-    "vitest": "^4.0.17"
+    "@biomejs/biome": "2.5.10",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/debug": "4.1.13",
+    "@types/node": "26.2.0",
+    "@types/pluralize": "0.0.33",
+    "@types/slug": "5.0.9",
+    "@types/supertest": "7.2.1",
+    "better-sqlite3": "^12.11.1",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "express": "^5.2.1",
+    "husky": "^9.1.7",
+    "mysql2": "^3.23.4",
+    "nodemon": "^3.1.14",
+    "rimraf": "^6.1.3",
+    "supertest": "^7.2.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
     "better-sqlite3": "^11.1.2 || ^12.0.0",
@@ -90,11 +84,11 @@
     }
   },
   "dependencies": {
-    "better-call": "^1.1.8",
-    "debug": "^4.4.1",
+    "better-call": "^1.4.0",
+    "debug": "^4.4.3",
     "pluralize": "^8.0.0",
-    "short-uuid": "^4.2.2",
-    "slug": "^4.1.0",
-    "zod": "^4.3.5"
+    "short-uuid": "^6.0.3",
+    "slug": "^12.0.1",
+    "zod": "^4.4.3"
   }
 }

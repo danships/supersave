@@ -166,54 +166,58 @@ describe('general filter tests', () => {
     };
 
     const superSave: SuperSave = await SuperSave.create(getConnection());
-    const planetRepository =
-      await superSave.addEntity<FilteredPlanet>(planetEntity);
+    let superSaveReinitialized: SuperSave | undefined;
+    let superSaveReinitializedAge: SuperSave | undefined;
 
-    await planetRepository.create({
-      name: 'Earth',
-      distance: 200,
-      visible: false,
-    });
+    try {
+      const planetRepository =
+        await superSave.addEntity<FilteredPlanet>(planetEntity);
 
-    // initialize it again, with filters
-    const superSaveReinitialized: SuperSave = await SuperSave.create(
-      getConnection()
-    );
-    const reinitializedPlanetRepository =
-      await superSaveReinitialized.addEntity<FilteredPlanet>(
-        filteredPlanetEntity
-      );
+      await planetRepository.create({
+        name: 'Earth',
+        distance: 200,
+        visible: false,
+      });
 
-    await reinitializedPlanetRepository.create({
-      name: 'Earth',
-      distance: 200,
-      visible: false,
-    });
+      // initialize it again, with filters
+      superSaveReinitialized = await SuperSave.create(getConnection());
+      const reinitializedPlanetRepository =
+        await superSaveReinitialized.addEntity<FilteredPlanet>(
+          filteredPlanetEntity
+        );
 
-    // initialize it again, with additional filters
-    const ageFilteredPlanetEntity: EntityDefinition = {
-      ...filteredPlanetEntity,
-      filterSortFields: {
-        name: 'string',
-        visible: 'boolean',
-        distance: 'number',
-      },
-    };
+      await reinitializedPlanetRepository.create({
+        name: 'Earth',
+        distance: 200,
+        visible: false,
+      });
 
-    const superSaveReinitializedAge: SuperSave = await SuperSave.create(
-      getConnection()
-    );
-    const reinitializedAgePlanetRepository =
-      await superSaveReinitializedAge.addEntity<FilteredPlanet>(
-        ageFilteredPlanetEntity
-      );
+      // initialize it again, with additional filters
+      const ageFilteredPlanetEntity: EntityDefinition = {
+        ...filteredPlanetEntity,
+        filterSortFields: {
+          name: 'string',
+          visible: 'boolean',
+          distance: 'number',
+        },
+      };
 
-    await reinitializedAgePlanetRepository.create({
-      name: 'Earth',
-      distance: 200,
-      visible: false,
-    });
-    await superSave.close();
+      superSaveReinitializedAge = await SuperSave.create(getConnection());
+      const reinitializedAgePlanetRepository =
+        await superSaveReinitializedAge.addEntity<FilteredPlanet>(
+          ageFilteredPlanetEntity
+        );
+
+      await reinitializedAgePlanetRepository.create({
+        name: 'Earth',
+        distance: 200,
+        visible: false,
+      });
+    } finally {
+      await superSave.close();
+      await superSaveReinitialized?.close();
+      await superSaveReinitializedAge?.close();
+    }
   });
 });
 

@@ -19,108 +19,120 @@ describe('createBefore hook', () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
-    await superSave.addCollection<Planet>({
-      ...planetCollection,
-      hooks: [
-        {
-          createBefore: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            entity: any
-          ) => {
-            return {
-              ...entity,
-              name: `HOOK-${entity.name}`,
-            };
+    try {
+      await superSave.addCollection<Planet>({
+        ...planetCollection,
+        hooks: [
+          {
+            createBefore: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              entity: any
+            ) => {
+              return {
+                ...entity,
+                name: `HOOK-${entity.name}`,
+              };
+            },
+            entityTransform: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              entity: any
+            ) => {
+              return {
+                ...entity,
+                extra: true,
+              };
+            },
           },
-          entityTransform: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            entity: any
-          ) => {
-            return {
-              ...entity,
-              extra: true,
-            };
-          },
-        },
-      ],
-    });
-    app.use('/', superSave.getNodeHandler());
+        ],
+      });
+      app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
+      const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
-    const response = await supertest(app)
-      .post('/planets')
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(200);
+      const response = await supertest(app)
+        .post('/planets')
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(200);
 
-    expect(response.body.data).toBeDefined();
-    expect(typeof response.body.data).toBe('object');
-    expect(response.body.data.name).toBe(`HOOK-${planet.name}`);
-    expect(response.body.data.extra).toEqual(true);
+      expect(response.body.data).toBeDefined();
+      expect(typeof response.body.data).toBe('object');
+      expect(response.body.data.name).toBe(`HOOK-${planet.name}`);
+      expect(response.body.data.extra).toEqual(true);
+    } finally {
+      await superSave.close();
+    }
   });
 
   test('the statusCode and message are copied from the exception', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
-    await superSave.addCollection<Planet>({
-      ...planetCollection,
-      hooks: [
-        {
-          createBefore: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            _entity: any
-          ) => {
-            throw new HookError('Test message', 401);
+    try {
+      await superSave.addCollection<Planet>({
+        ...planetCollection,
+        hooks: [
+          {
+            createBefore: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              _entity: any
+            ) => {
+              throw new HookError('Test message', 401);
+            },
           },
-        },
-      ],
-    });
-    app.use('/', superSave.getNodeHandler());
+        ],
+      });
+      app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
+      const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
-    const response = await supertest(app)
-      .post('/planets')
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(401);
+      const response = await supertest(app)
+        .post('/planets')
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(401);
 
-    expect(response.body.message).toBe('Test message');
+      expect(response.body.message).toBe('Test message');
+    } finally {
+      await superSave.close();
+    }
   });
 
   test('the message is copied from the exception', async () => {
     const app: express.Application = express();
     const superSave = await SuperSave.create(getConnection());
 
-    await superSave.addCollection<Planet>({
-      ...planetCollection,
-      hooks: [
-        {
-          createBefore: (
-            _collection: Collection,
-            _ctx: HttpContext,
-            _entity: any
-          ) => {
-            throw new HookError('Test message');
+    try {
+      await superSave.addCollection<Planet>({
+        ...planetCollection,
+        hooks: [
+          {
+            createBefore: (
+              _collection: Collection,
+              _ctx: HttpContext,
+              _entity: any
+            ) => {
+              throw new HookError('Test message');
+            },
           },
-        },
-      ],
-    });
-    app.use('/', superSave.getNodeHandler());
+        ],
+      });
+      app.use('/', superSave.getNodeHandler());
 
-    const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
+      const planet: Omit<Planet, 'id'> = { name: 'Jupiter' };
 
-    const response = await supertest(app)
-      .post('/planets')
-      .send(planet)
-      .expect('Content-Type', /json/)
-      .expect(500);
+      const response = await supertest(app)
+        .post('/planets')
+        .send(planet)
+        .expect('Content-Type', /json/)
+        .expect(500);
 
-    expect(response.body.message).toBe('Test message');
+      expect(response.body.message).toBe('Test message');
+    } finally {
+      await superSave.close();
+    }
   });
 });

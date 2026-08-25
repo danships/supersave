@@ -5,5 +5,16 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     exclude: ['node_modules', 'dist'],
+    // better-sqlite3 is not thread-safe; run tests in isolated
+    // child processes instead of worker threads to avoid crashes.
+    pool: 'forks',
+    // Vitest 4's forks pool can spawn multiple workers even when file
+    // parallelism is disabled via the CLI flag, which crashes native
+    // addons like better-sqlite3 on CI. Force a single worker so all
+    // test files run sequentially in the same child process, and
+    // disable isolation so they share that single fork.
+    fileParallelism: false,
+    maxWorkers: 1,
+    isolate: false,
   },
 });

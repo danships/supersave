@@ -17,12 +17,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.13.0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.10.0
+          version: 11.22.0
 
       - name: Get pnpm store directory
         shell: bash
@@ -41,7 +41,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Security Audit
-        run: pnpm audit --prod --audit-level=moderate
+        run: pnpm audit
 
       - name: Cache build output
         uses: actions/cache@v4
@@ -71,8 +71,36 @@ jobs:
             -p 3307:3306 \
             mariadb:11.7.2
 
-          # Wait for Mariadb to be ready
-          docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --wait=30
+          # The official mariadb image starts a temporary server to run
+          # init scripts, then shuts it down before starting the real server.
+          # A plain "mariadb-admin ping" can succeed against that temporary
+          # server, causing the connection to be dropped once it restarts.
+          # Wait for "ready for connections" to appear twice in the logs
+          # (once for the temporary server, once for the final one) before
+          # relying on the connection.
+          for _ in $(seq 1 60); do
+            READY_COUNT=$(docker logs mariadb-test 2>&1 | grep -c "ready for connections" || true)
+            if [ "$READY_COUNT" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          # Bound the ping loop so a container that never becomes reachable
+          # fails fast instead of hanging until the job-level timeout.
+          PING_OK=false
+          for _ in $(seq 1 60); do
+            if docker exec mariadb-test mariadb-admin ping -h localhost -u root -ptestpassword --silent; then
+              PING_OK=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$PING_OK" != "true" ]; then
+            echo "::error::MariaDB did not become ready in time"
+            docker logs mariadb-test
+            exit 1
+          fi
 
           pnpm test:mariadb
 
@@ -91,11 +119,138 @@ jobs:
             -p 3306:3306 \
             mysql:8.4
 
-          # Wait for MySQL to be ready
-          docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --wait=30
+          # The official mysql image starts a temporary server to run init
+          # scripts, then shuts it down before starting the real server. A
+          # plain "mysqladmin ping" can succeed against that temporary
+          # server, causing the connection to be dropped once it restarts.
+          # Wait for "ready for connections" to appear twice in the logs
+          # (once for the temporary server, once for the final one) before
+          # relying on the connection.
+          for _ in $(seq 1 60); do
+            READY_COUNT=$(docker logs mysql-test 2>&1 | grep -c "ready for connections" || true)
+            if [ "$READY_COUNT" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          # Bound the ping loop so a container that never becomes reachable
+          # fails fast instead of hanging until the job-level timeout.
+          PING_OK=false
+          for _ in $(seq 1 60); do
+            if docker exec mysql-test mysqladmin ping -h 127.0.0.1 -u root -ptestpassword --silent; then
+              PING_OK=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$PING_OK" != "true" ]; then
+            echo "::error::MySQL did not become ready in time"
+            docker logs mysql-test
+            exit 1
+          fi
 
           pnpm test:mysql
 
       - name: Stop MySQL container
         if: always()
         run: docker stop mysql-test
+
+  peer-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: better-sqlite3
+            version: 11.1.2
+            suite: test
+          - driver: better-sqlite3
+            version: 12.0.0
+            suite: test
+          - driver: mysql2
+            version: 3.11.0
+            suite: test:mysql
+          - driver: mysql2
+            version: 3.23.4
+            suite: test:mariadb
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Select peer version
+        run: pnpm add --lockfile=false ${{ matrix.driver }}@${{ matrix.version }}
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Start database
+        if: matrix.driver == 'mysql2'
+        run: |
+          if [ "${{ matrix.suite }}" = "test:mysql" ]; then
+            IMAGE=mysql:8.4
+            PORT=3306
+            PING_CMD=mysqladmin
+          else
+            IMAGE=mariadb:11.7.2
+            PORT=3307
+            PING_CMD=mariadb-admin
+          fi
+          docker run -d --rm --name peer-database \
+            -e MYSQL_ROOT_PASSWORD=testpassword \
+            -e MYSQL_DATABASE=supersave \
+            -e MYSQL_USER=supersave \
+            -e MYSQL_PASSWORD=savesuper \
+            -p "$PORT:3306" "$IMAGE"
+
+          # The official mysql/mariadb images start a temporary server to run
+          # init scripts, then shut it down before starting the real server.
+          # A plain "mysqladmin ping" can succeed against that temporary
+          # server, causing the connection to be dropped once it restarts.
+          # Wait for "ready for connections" to appear twice in the logs
+          # (once for the temporary server, once for the final one) before
+          # relying on the connection.
+          for _ in $(seq 1 60); do
+            READY_COUNT=$(docker logs peer-database 2>&1 | grep -c "ready for connections" || true)
+            if [ "$READY_COUNT" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          # Bound the ping loop so a container that never becomes reachable
+          # fails fast instead of hanging until the job-level timeout.
+          PING_OK=false
+          for _ in $(seq 1 60); do
+            if docker exec peer-database "$PING_CMD" ping -h localhost -u root -ptestpassword --silent; then
+              PING_OK=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$PING_OK" != "true" ]; then
+            echo "::error::Peer database did not become ready in time"
+            docker logs peer-database
+            exit 1
+          fi
+
+      - name: Run peer suite
+        run: pnpm ${{ matrix.suite }}
+
+      - name: Stop database
+        if: always() && matrix.driver == 'mysql2'
+        run: docker stop peer-database

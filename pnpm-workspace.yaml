@@ -1,4 +1,26 @@
-ignoredBuiltDependencies:
-  - husky
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+overrides:
+  body-parser: 2.3.0
+  form-data: 4.0.6
+  nanoid: 3.3.18
+  path-to-regexp: 8.4.0
+  picomatch@^2.0.0: 2.3.2
+  picomatch@^4.0.0: 4.0.4
+  postcss: 8.5.23
+  qs: 6.15.2
+  rollup: 4.59.0
+  vite: 7.3.5
+minimumReleaseAgeExclude:
+  - '@biomejs/biome@2.5.10'
+  - '@biomejs/cli-darwin-arm64@2.5.10'
+  - '@biomejs/cli-darwin-x64@2.5.10'
+  - '@biomejs/cli-linux-arm64-musl@2.5.10'
+  - '@biomejs/cli-linux-arm64@2.5.10'
+  - '@biomejs/cli-linux-x64-musl@2.5.10'
+  - '@biomejs/cli-linux-x64@2.5.10'
+  - '@biomejs/cli-win32-arm64@2.5.10'
+  - '@biomejs/cli-win32-x64@2.5.10'
 onlyBuiltDependencies:
   - better-sqlite3

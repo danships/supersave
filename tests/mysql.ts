@@ -1,6 +1,41 @@
 import mysql, { type Connection } from 'mysql2/promise';
 import getConnection from './connection.js';
 
+// When a freshly started MySQL/MariaDB container (as used in CI) has only
+// just reported "ready for connections", it can still briefly reset new
+// connections while it finishes internal startup work. Retry transient
+// connection errors instead of failing the whole test file immediately.
+const RETRYABLE_CONNECTION_ERROR_CODES = new Set([
+  'PROTOCOL_CONNECTION_LOST',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+]);
+
+async function createConnectionWithRetry(
+  connectionString: string,
+  maxAttempts: number = 10,
+  delayMs: number = 500
+): Promise<Connection> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await mysql.createConnection(connectionString);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (
+        attempt === maxAttempts ||
+        !code ||
+        !RETRYABLE_CONNECTION_ERROR_CODES.has(code)
+      ) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  // Unreachable, but keeps TypeScript happy.
+  throw new Error('Failed to create MySQL connection after retries');
+}
+
 export const clear = async (): Promise<void> => {
   const connectionString = getConnection();
 
@@ -8,7 +43,8 @@ export const clear = async (): Promise<void> => {
     return;
   }
 
-  const connection: Connection = await mysql.createConnection(connectionString);
+  const connection: Connection =
+    await createConnectionWithRetry(connectionString);
 
   const tables: Record<string, any>[] = await getQuery(
     connection,

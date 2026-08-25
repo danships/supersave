@@ -7,7 +7,7 @@ import Repository from './repository.js';
 
 const debug: Debugger = Debug('supersave:db:em');
 
-export { Repository, Query, EntityManager };
+export { EntityManager, Query, Repository };
 
 export const MYSQL = 'mysql';
 export const SQLITE = 'sqlite';

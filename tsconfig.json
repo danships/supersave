@@ -6,6 +6,7 @@
     "lib": ["ES2022", "DOM"],
     "allowJs": false,
     "declaration": true,
+    "rootDir": "./src",
     "outDir": "./dist",
     "strict": true,
     "noImplicitAny": true,

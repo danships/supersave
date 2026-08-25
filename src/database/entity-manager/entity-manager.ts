@@ -2,7 +2,7 @@ import type { BaseEntity, EntityDefinition } from '../types.js';
 import Query from './query.js';
 import Repository from './repository.js';
 
-export { Repository, Query };
+export { Query, Repository };
 
 export type AddEntityOptions = {
   skipSync?: boolean;
