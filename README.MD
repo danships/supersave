@@ -97,6 +97,7 @@ To query entities programmatically (not via HTTP API), use the `createQuery()` m
 | Method | Description |
 | ------- | ----------- |
 | `eq(field, value)` | Equals |
+| `isNull(field)` | Checks SQL `NULL` without accepting a value |
 | `gt(field, value)` | Greater than |
 | `gte(field, value)` | Greater than or equal |
 | `lt(field, value)` | Less than |
@@ -106,6 +107,11 @@ To query entities programmatically (not via HTTP API), use the `createQuery()` m
 | `sort(field, direction)` | Sort by field (`'asc'` or `'desc'`) |
 | `limit(n)` | Limit results |
 | `offset(n)` | Skip results (pagination) |
+
+For nullable generated filter columns, `isNull(field)` matches both explicit JSON
+`null` values and missing JSON properties:
+
+    planetRepository.createQuery().isNull('description');
 
 ### Implicit AND (Default)
 
