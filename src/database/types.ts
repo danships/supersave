@@ -29,6 +29,7 @@ export interface EntityRow {
 
 export enum QueryOperatorEnum {
   EQUALS = '=',
+  IS_NULL = 'IS NULL',
   GREATER_THAN = '>',
   GREATER_THAN_EQUALS = '>=',
   LESS_THAN = '<',

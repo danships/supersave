@@ -50,6 +50,10 @@ class Query {
     return this.addFilter(QueryOperatorEnum.EQUALS, field, value);
   }
 
+  public isNull(field: string): Query {
+    return this.addFilter(QueryOperatorEnum.IS_NULL, field, null);
+  }
+
   public gt(field: string, value: QueryFilterValue): Query {
     return this.addFilter(QueryOperatorEnum.GREATER_THAN, field, value);
   }

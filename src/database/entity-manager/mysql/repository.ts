@@ -101,6 +101,10 @@ class Repository<T extends BaseEntity> extends BaseRepository<T> {
     }
 
     const filter = condition as QueryFilter;
+    if (filter.operator === QueryOperatorEnum.IS_NULL) {
+      return `${this.pool.escapeId(filter.field)} IS NULL`;
+    }
+
     if (filter.operator === QueryOperatorEnum.IN) {
       if (Array.isArray(filter.value) && filter.value.length === 0) {
         return '1 = 0';
